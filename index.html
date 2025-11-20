@@ -13,7 +13,7 @@
             font-family: 'Inter', sans-serif;
         }
         .input-group {
-            margin-bottom: 1rem;
+            margin-bottom: 0.5rem; /* Reduced from 1rem to save vertical space */
         }
         .input-group label {
             display: block;
@@ -123,7 +123,7 @@
             background-color: white;
             border-radius: 0.75rem;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
-            padding: 1.5rem;
+            padding: 1rem; /* Reduced from 1.5rem to save vertical space */
         }
         /* Flashing effect for past/current date */
         @keyframes flash {
@@ -249,6 +249,9 @@
                 align-items: flex-start;
                 padding: 0.5rem 0;
             }
+            .output-group:last-child {
+                border-bottom: none;
+            }
             .output-group .label {
                 margin-bottom: 0.25rem;
                 font-size: 0.875rem; /* 14px */
@@ -259,15 +262,22 @@
             }
              /* Special handling for the header row in the final table */
             .output-group.font-bold {
-                flex-direction: row; /* Keep header as row */
-                justify-content: space-between;
+                flex-direction: column; /* Ensure stacked layout for bold groups */
+                align-items: flex-start;
+                padding: 0.5rem 0;
             }
             .output-group.font-bold .label {
-                 margin-bottom: 0;
-                 font-size: 1rem; /* 16px */
+                 margin-bottom: 0.25rem; /* Restore margin for stacked label */
+                 font-size: 0.875rem; /* Match font size of standard output label */
                  width: auto !important; /* Override width */
             }
-             /* Special handling for the 3-column rows in final table */
+             /* Ensure the value is visible and indented for bold groups */
+            .output-group.font-bold .value {
+                font-size: 1rem; 
+                padding-left: 0.5rem;
+            }
+            
+            /* Special handling for the 3-column rows in final table */
              .output-group .w-1\/3 {
                 width: 100% !important; /* Make columns full width */
                 text-align: left !important; /* Align text left */
@@ -302,7 +312,7 @@
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             
             <!-- COLUMN 1: Inputs -->
-            <div class="space-y-8">
+            <div class="space-y-3"> <!-- Reduced vertical spacing between cards from 8 to 3 -->
                 
                 <!-- Input Section: Service & Personal -->
                 <div class="card">
@@ -320,23 +330,27 @@
                             
                             <div class="input-group">
                                 <label for="dob">Date of Birth (DOB)</label>
-                                <input type="date" id="dob" class="calc-input" value="">
+                                <!-- Disabled by default, enabled via JS -->
+                                <input type="date" id="dob" class="calc-input" value="" disabled>
                                 <div id="dob-display" class="text-xs text-gray-500 mt-1"></div>
                             </div>
                             <div class="input-group">
                                 <label for="doj">Date of Joining (DOJ)</label>
-                                <input type="date" id="doj" class="calc-input" value="">
+                                <!-- Disabled by default -->
+                                <input type="date" id="doj" class="calc-input" value="" disabled>
                                 <div id="doj-display" class="text-xs text-gray-500 mt-1"></div>
                             </div>
                             <div class="input-group">
                                 <label for="sos">Date of Retirment (SOS)</label>
-                                <input type="date" id="sos" class="calc-input" value="">
+                                <!-- Disabled by default -->
+                                <input type="date" id="sos" class="calc-input" value="" disabled>
                                 <div id="sos-display" class="text-xs text-gray-500 mt-1"></div>
                             </div>
                             
                             <div class="input-group">
                                 <label for="bps">BPS (Basic Pay Scale)</label>
-                                <select id="bps" class="calc-input">
+                                <!-- Disabled by default -->
+                                <select id="bps" class="calc-input" disabled>
                                     <option value="" disabled selected>Select BPS</option>
                                     <!-- Options will be populated by JavaScript in DOMContentLoaded -->
                                 </select>
@@ -345,7 +359,8 @@
                             <!-- MOVED: Family Pension is now after BPS -->
                             <div class="input-group">
                                <label for="family-pension">Family Pension</label>
-                                <select id="family-pension" class="calc-input">
+                               <!-- Disabled by default -->
+                                <select id="family-pension" class="calc-input" disabled>
                                     <option value="No" selected>No</option>
                                     <option value="Yes">Yes</option>
                                 </select>
@@ -361,7 +376,8 @@
                                     </span>
                                 </label>
                                 <div class="pension-input-wrapper">
-                                    <input type="text" id="gross-pension-ppo" class="calc-input" readonly>
+                                    <!-- Disabled by default -->
+                                    <input type="text" id="gross-pension-ppo" class="calc-input" readonly disabled>
                                 </div>
                             </div>
                         </div>
@@ -374,23 +390,27 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
                         <div class="input-group">
-                            <label for="basic-pay">Basic Pay</label>
-                            <input type="text" id="basic-pay" class="pay-input calc-input" min="0">
+                            <label for="basic-pay">Basic Pay / 24 Months Avg Pay</label>
+                            <!-- Disabled by default -->
+                            <input type="text" id="basic-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
                         
                         <div class="input-group">
                             <label for="personnel-pay">Personnel Pay</label>
-                            <input type="text" id="personnel-pay" class="pay-input calc-input" min="0">
+                            <!-- Disabled by default -->
+                            <input type="text" id="personnel-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
 
                         <div class="input-group">
                             <label for="qualification-pay">Qualification Pay</label>
-                            <input type="text" id="qualification-pay" class="pay-input calc-input" min="0">
+                            <!-- Disabled by default -->
+                            <input type="text" id="qualification-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
                         
                         <div class="input-group">
                             <label for="other-pay">Other Pay</label>
-                            <input type="text" id="other-pay" class="pay-input calc-input" min="0">
+                            <!-- Disabled by default -->
+                            <input type="text" id="other-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
                         
                         <div class="input-group md:col-span-2 pt-2 border-t mt-4">
@@ -399,9 +419,36 @@
                             <input type="text" id="total-pay" class="calc-input bg-gray-50" readonly>
                         </div>
 
+                        <!-- NEW FIELD: Gross Pension (Calculated Before Penalty) -->
+                        <div class="input-group md:col-span-2">
+                            <!-- Added ID to label for dynamic updating -->
+                            <label id="gross-pension-calc-label" for="gross-pension-calc" class="font-bold text-gray-700">Gross Pension</label>
+                            <input type="text" id="gross-pension-calc" class="calc-input bg-gray-50" readonly>
+                        </div>
+
                     </div>
                 </div>
-                <!-- END NEW CARD -->
+                <!-- END PAY COMPONENTS CARD -->
+                
+                <!-- NEW CARD: Penalty in Gross Pension -->
+                <!-- Added ID to card to control visibility -->
+                <div class="card" id="penalty-card" style="display: none;">
+                    <h3 class="font-semibold text-lg mb-4 text-gray-600 border-b pb-2">Penalty in Gross Pension</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <!-- NEW FIELD: Total Months before Superannuation -->
+                        <div class="input-group">
+                            <label for="months-before-superannuation">Total Months before Superannuation</label>
+                            <input type="text" id="months-before-superannuation" class="calc-input bg-gray-50" readonly>
+                        </div>
+                         <!-- Deduction Amount Field -->
+                        <div class="input-group">
+                            <label for="pension-penalty" class="text-red-600 font-bold">Deduction Amount</label>
+                            <input type="text" id="pension-penalty" class="calc-input text-red-600" min="0" value="0">
+                        </div>
+                    </div>
+                </div>
+                <!-- END PENALTY CARD -->
+                
 
             </div>
             <!-- END COLUMN 1 -->
@@ -692,7 +739,7 @@
 
 
         // --- 2. DATA CONSTANTS (Remain unchanged) ---
-
+        // Place constants at the top level of the script
         const pensionData = [
             { age: 20, val_2001: 40.5043, val_1986: 50.6304, val_1966: 24.265 }, { age: 21, val_2001: 39.7341, val_1986: 49.6676, val_1966: 24.061 }, { age: 22, val_2001: 38.9653, val_1986: 48.7066, val_1966: 23.853 }, { age: 23, val_2001: 38.1974, val_1986: 47.7467, val_1966: 23.64 }, { age: 24, val_2001: 37.4307, val_1986: 46.7884, val_1966: 23.424 }, { age: 25, val_2001: 36.6651, val_1986: 45.8314, val_1966: 23.203 }, { age: 26, val_2001: 35.9006, val_1986: 44.8758, val_1966: 22.978 }, { age: 27, val_2001: 35.1372, val_1986: 43.9215, val_1966: 22.747 }, { age: 28, val_2001: 34.375, val_1986: 42.9688, val_1966: 22.513 }, { age: 29, val_2001: 33.6143, val_1986: 42.0179, val_1966: 22.273 }, { age: 30, val_2001: 32.8071, val_1986: 41.0089, val_1966: 22.028 }, { age: 31, val_2001: 32.0974, val_1986: 40.1218, val_1966: 21.077 }, { age: 32, val_2001: 31.3412, val_1986: 39.1767, val_1966: 21.522 }, { age: 33, val_2001: 30.5869, val_1986: 38.2336, val_1966: 21.26 }, { age: 34, val_2001: 29.8343, val_1986: 37.2929, val_1966: 20.993 }, { age: 35, val_2001: 29.0841, val_1986: 36.3551, val_1966: 20.72 }, { age: 36, val_2001: 28.3362, val_1986: 35.4203, val_1966: 20.442 }, { age: 37, val_2001: 27.5908, val_1986: 34.4885, val_1966: 20.157 }, { age: 38, val_2001: 26.8482, val_1986: 33.5603, val_1966: 19.867 }, { age: 39, val_2001: 26.1009, val_1986: 32.6361, val_1966: 19.57 }, { age: 40, val_2001: 25.3728, val_1986: 31.716, val_1966: 19.267 }, { age: 41, val_2001: 24.6406, val_1986: 30.8007, val_1966: 18.956 }, { age: 42, val_2001: 23.9126, val_1986: 29.8907, val_1966: 18.641 }, { age: 43, val_2001: 23.184, val_1986: 28.98, val_1966: 18.318 }, { age: 44, val_2001: 22.4713, val_1986: 28.0891, val_1966: 17.988 }, { age: 45, val_2001: 21.7592, val_1986: 27.199, val_1966: 17.65 }, { age: 46, val_2001: 21.0538, val_1986: 26.3172, val_1966: 17.307 }, { age: 47, val_2001: 20.3555, val_1986: 25.4444, val_1966: 16.956 }, { age: 48, val_2001: 19.6653, val_1986: 24.5816, val_1966: 16.596 }, { age: 49, val_2001: 18.9841, val_1986: 23.7301, val_1966: 16.231 }, { age: 50, val_2001: 18.3129, val_1986: 22.8911, val_1966: 15.859 }, { age: 51, val_2001: 17.6526, val_1986: 22.0658, val_1966: 15.481 }, { age: 52, val_2001: 17.005, val_1986: 21.2563, val_1966: 15.096 }, { age: 53, val_2001: 16.371, val_1986: 20.638, val_1966: 14.707 }, { age: 54, val_2001: 15.7517, val_1986: 19.6896, val_1966: 14.313 }, { age: 55, val_2001: 15.1478, val_1986: 18.9348, val_1966: 13.915 }, { age: 56, val_2001: 14.5602, val_1986: 18.2002, val_1966: 13.513 }, { age: 57, val_2001: 13.9888, val_1986: 17.486, val_1966: 13.109 }, { age: 58, val_2001: 13.434, val_1986: 16.7925, val_1966: 12.702 }, { age: 59, val_2001: 12.8953, val_1986: 16.1191, val_1966: 12.294 }, { age: 60, val_2001: 12.3719, val_1986: 15.4649, val_1966: 11.886 }, { age: 61, val_2001: 11.8632, val_1986: 14.829, val_1966: 11.497 }, { age: 62, val_2001: 11.3684, val_1986: 14.2105, val_1966: 11.104 }, { age: 63, val_2001: 10.8872, val_1986: 13.609, val_1966: 10.713 }, { age: 64, val_2001: 10.4191, val_1986: 13.0239, val_1966: 10.327 }, { age: 65, val_2001: 9.9636, val_1986: 12.4549, val_1966: 9.946 }, { age: 66, val_2001: 9.5214, val_1986: 11.9017, val_1966: 9.57 }, { age: 67, val_2001: 9.0914, val_1986: 11.3643, val_1966: 9.2 }, { age: 68, val_2001: 8.6742, val_1986: 10.5428, val_1966: 8.836 }, { age: 69, val_2001: 8.2697, val_1986: 10.3371, val_1966: 8.478 }, { age: 70, val_2001: 7.8778, val_1986: 9.8472, val_1966: 8.127 }, { age: 71, val_2001: 7.4983, val_1986: 9.3729, val_1966: 7.783 }, { age: 72, val_2001: 7.1314, val_1986: 8.9142, val_1966: 7.448 }, { age: 73, val_2001: 6.7766, val_1986: 8.4708, val_1966: 7.121 }, { age: 74, val_2001: 6.4342, val_1986: 8.0427, val_1966: 6.802 }, { age: 75, val_2001: 6.1039, val_1986: 7.6299, val_1966: 6.494 }, { age: 76, val_2001: 5.7858, val_1986: 7.2322, val_1966: 6.194 }, { age: 77, val_2001: 5.4797, val_1986: 6.8496, val_1966: 5.906 }, { age: 78, val_2001: 5.1854, val_1986: 6.4818, val_1966: 5.627 }, { age: 79, val_2001: 4.903, val_1986: 6.1284, val_1966: 5.364 }, { age: 80, val_2001: 4.6321, val_1986: 5.7901, val_1966: 5.104 }
         ];
@@ -964,6 +1011,11 @@
             const payInputs = document.querySelectorAll('.pay-input');
             payInputs.forEach(input => input.value = '');
             document.getElementById('total-pay').value = '';
+            // Clear new Gross Pension field in Pay Components card
+            document.getElementById('gross-pension-calc').value = '';
+             // Clear penalty fields
+            document.getElementById('months-before-superannuation').value = '';
+            document.getElementById('pension-penalty').value = '0';
 
             checkInputEnabling();
             calculateAndDisplayAll();
@@ -1025,11 +1077,16 @@
         function calculateTotalPay() {
             const linkCheckbox = document.getElementById('link-gross-pension');
             const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
+            const pensionPenaltyInput = document.getElementById('pension-penalty');
+            const grossPensionCalcInput = document.getElementById('gross-pension-calc'); // New field reference
             
             const basicPay = parseFloat(document.getElementById('basic-pay').value.replace(/,/g, '')) || 0;
             const personnelPay = parseFloat(document.getElementById('personnel-pay').value.replace(/,/g, '')) || 0;
             const qualificationPay = parseFloat(document.getElementById('qualification-pay').value.replace(/,/g, '')) || 0;
             const otherPay = parseFloat(document.getElementById('other-pay').value.replace(/,/g, '')) || 0;
+            
+            // Note: We read penaltyAmount below after checking applicability, but need a default
+            let penaltyAmount = 0;
 
             const totalPay = basicPay + personnelPay + qualificationPay + otherPay;
             
@@ -1043,11 +1100,13 @@
                 // --- START NEW FORMULA IMPLEMENTATION ---
                 const dojInput = document.getElementById('doj'); 
                 const sosInput = document.getElementById('sos');
+                const dobInput = document.getElementById('dob'); 
 
                 // 1. Calculate Capped Qualifying Service (B13 logic)
                 let cappedQS = 0;
                 const dojDate = parseDate(dojInput.value); 
                 const sosDate = parseDate(sosInput.value);
+                const dobDate = parseDate(dobInput.value);
 
                 if (dojDate && sosDate) {
                     const serviceInMillis = sosDate - dojDate; 
@@ -1063,15 +1122,81 @@
                 let calculatedGrossPension = 0;
                 if (totalPay > 0 && cappedQS > 0) {
                     // Formula: ROUND((Total Pay * 7 / 300 * Capped QS), 2)
-                    // Note: 7/300 is the formula factor
                     calculatedGrossPension = roundToTwoDecimals((totalPay * 7 / 300) * cappedQS);
                 }
+
+                // UPDATE THE NEW FIELD: Gross Pension (Before Penalty)
+                // This displays the value BEFORE any deduction
+                grossPensionCalcInput.value = formatCurrency(calculatedGrossPension, false).replace('Rs. ', '');
+
+                // NEW: Calculate Total Months before Superannuation AND Penalty
+                let totalMonthsBeforeSuper = 0;
+                let calculatedPenalty = 0; // Initialize calculated penalty
                 
-                // Update the Gross Pension PPO input with the calculated gross pension
-                grossPensionPPOInput.value = formatCurrency(calculatedGrossPension, false).replace('Rs. ', '');
+                // UPDATED LOGIC: Penalty is strictly applicable if SOS > 09-09-2024
+                // So if SOS is 10-09-2024 or later, penalty applies.
+                const penaltyCutoff = new Date('2024-09-09T00:00:00Z');
+                const isPenaltyApplicable = sosDate && sosDate > penaltyCutoff;
+
+                if (isPenaltyApplicable && dobDate && sosDate) {
+                    // Superannuation Date = DOB + 60 years
+                    const superannuationDate = new Date(dobDate);
+                    superannuationDate.setUTCFullYear(superannuationDate.getUTCFullYear() + 60);
+
+                    // Calculate months between SOS and Superannuation Date
+                    let monthsDiff = (superannuationDate.getUTCFullYear() - sosDate.getUTCFullYear()) * 12;
+                    monthsDiff += superannuationDate.getUTCMonth() - sosDate.getUTCMonth();
+                    
+                    if (sosDate.getUTCDate() > superannuationDate.getUTCDate()) {
+                        monthsDiff--;
+                    }
+                    
+                    totalMonthsBeforeSuper = Math.max(0, monthsDiff);
+                    document.getElementById('months-before-superannuation').value = totalMonthsBeforeSuper;
+
+                    // ** Calculate Penalty Amount **
+                    // Formula: (Total Months / 12) * 3%
+                    let penaltyRate = (totalMonthsBeforeSuper / 12) * 0.03;
+                    // Cap rate at 20% (0.20)
+                    if (penaltyRate > 0.20) {
+                        penaltyRate = 0.20;
+                    }
+                    
+                    // Calculate Deduction Amount
+                    if (calculatedGrossPension > 0) {
+                        calculatedPenalty = roundToTwoDecimals(calculatedGrossPension * penaltyRate);
+                        
+                        // Update the penalty input field with formatting
+                        pensionPenaltyInput.value = formatCurrency(calculatedPenalty, false).replace('Rs. ', '');
+                    } else {
+                         pensionPenaltyInput.value = "0.00";
+                    }
+                    
+                    penaltyAmount = calculatedPenalty;
+
+                } else {
+                    // Penalty not applicable or dates missing
+                    document.getElementById('months-before-superannuation').value = '';
+                    pensionPenaltyInput.value = "0.00";
+                    penaltyAmount = 0;
+                }
                 
-                return calculatedGrossPension;
+                // 2. APPLY PENALTY: Subtract calculated penalty from the calculated gross pension
+                let finalGrossPension = calculatedGrossPension - penaltyAmount;
+                if (finalGrossPension < 0) finalGrossPension = 0;
+
+                // Update the Gross Pension PPO input with the final adjusted gross pension (after penalty)
+                grossPensionPPOInput.value = formatCurrency(finalGrossPension, false).replace('Rs. ', '');
+                
+                return finalGrossPension;
                 // --- END NEW FORMULA IMPLEMENTATION ---
+            } else {
+                // If link is unchecked, clear the calc field or set to 0 as it's not actively driven by components
+                grossPensionCalcInput.value = ''; 
+                // Also clear penalty auto-calc fields if manual mode is active (optional, but cleaner)
+                document.getElementById('months-before-superannuation').value = '';
+                // We don't clear penalty amount as user might want to enter it manually if enabled? 
+                // For now, logic keeps it as read-only auto-calc when linked.
             }
             
             // If the box is unchecked, return the manually entered value
@@ -1237,7 +1362,7 @@
                     currentNetValue = roundToTwoDecimals(previousNetValueCurrent + currentIncreaseValue);
                     isNetCalculatedCurrent = true;
                 } else if (year === 1990) {
-                    restoredBaseLine = previousNetValueRestored; 
+                    restoredBaseLine = previousNetValueRestored;
                     if (isEntitled === 'Y' && !isNaN(percentageValue)) {
                         const baseForIncrease = Math.max(restoredBaseLine, applicableMinPension);
                         restoredIncreaseValue = roundToTwoDecimals(baseForIncrease * percentageValue); 
@@ -1403,283 +1528,253 @@
         }
 
         function calculateAndDisplayAll() {
-            // Get the Gross Pension PPO value based on the link toggle state
+            // 1. Calculate and Update Inputs (Gross Pension Input)
+            // This needs to happen to ensure the 'Gross Pension' field shows the value based on Pay Components
             const grossPensionPPO = calculateTotalPay(); 
-            
-            // GUARD CLAUSE: If Gross Pension is zero or less, reset outputs and stop.
-            if (grossPensionPPO <= 0) {
-                resetOutputFields();
-                
-                // Clear any pending log debounce timer when calculation is invalid/zero
-                if (logDebounceTimer) {
-                    clearTimeout(logDebounceTimer);
-                    logDebounceTimer = null;
-                }
-                return;
-            }
-            
-            try {
-                const dobInput = document.getElementById('dob');
-                const dojInput = document.getElementById('doj'); 
-                const sosInput = document.getElementById('sos'); 
-                const bpsInput = document.getElementById('bps'); // Added: BPS Input
-                const familyPensionInput = document.getElementById('family-pension');
-                
-                const dobDate = parseDate(dobInput.value);
-                const dojDate = parseDate(dojInput.value); 
-                const sosDate = parseDate(sosInput.value);
-                const bpsValue = parseInt(bpsInput.value); // Parse BPS value as integer
-                const isFamilyPension = familyPensionInput.value === 'Yes';
-                
-                document.getElementById('dob-display').textContent = formatDateDisplay(dobDate);
-                document.getElementById('doj-display').textContent = formatDateDisplay(dojDate); 
-                document.getElementById('sos-display').textContent = formatDateDisplay(sosDate);
 
-                let roundedQS = 0;
-                let ageNextBirthday = 0;
-                let commutationFactor = 0;
-                let restorationDate = null;
-                
-                if (dojDate && sosDate) { 
-                    const serviceInMillis = sosDate - dojDate; 
-                    const serviceInYearsDecimal = serviceInMillis / (1000 * 60 * 60 * 24 * 365.25);
-                    roundedQS = Math.round(serviceInYearsDecimal);
-
-                    // Apply 30-year cap for QS calculation
-                    if (roundedQS > 30) {
-                        roundedQS = 30;
-                    }
-
-                    if (dobDate) {
-                        const sosPlusOneDay = new Date(sosDate);
-                        sosPlusOneDay.setUTCDate(sosPlusOneDay.getUTCDate() + 1);
-                        const ageAtSOSInYears = (sosPlusOneDay - dobDate) / (1000 * 60 * 60 * 24 * 365.25);
-                        ageNextBirthday = Math.ceil(ageAtSOSInYears);
-                    }
-
-                    let factorsToUse = null;
-                    const policyDate2001 = parseDate('2001-12-01');
-                    const policyDate1986 = parseDate('1986-07-01');
-                    if (sosDate >= policyDate2001) factorsToUse = factors_2001_12_01;
-                    else if (sosDate >= policyDate1986) factorsToUse = factors_1986_07_01;
-                    else factorsToUse = factors_1966_07_01;
-                    commutationFactor = factorsToUse[ageNextBirthday] || 0;
-
-                    const roundedCommutationFactor = Math.round(commutationFactor);
-                    
-                    // NEW RESTORATION DATE LOGIC: SOS + 1 day + Commutation Years
-                    const restorationBaseDate = new Date(sosDate);
-                    restorationBaseDate.setUTCDate(restorationBaseDate.getUTCDate() + 1);
-                    restorationDate = restorationBaseDate;
-                    restorationDate.setUTCFullYear(restorationDate.getUTCFullYear() + roundedCommutationFactor);
-                }
-                
-                let grossPension = grossPensionPPO;
-                if (isFamilyPension) {
-                    // This is the main gross pension figure used for subsequent calculations (commutation, increases table)
-                    grossPension = roundToTwoDecimals(grossPensionPPO * 0.75);
-                }
-
-                let commutedPensionPercentage = 0;
-                if (sosDate) {
-                    const date2005 = parseDate('2005-06-30');
-                    const date2001 = parseDate('2001-11-30');
-                    if (sosDate > date2005) commutedPensionPercentage = 0.35;
-                    else if (sosDate > date2001) commutedPensionPercentage = 0.40;
-                    else commutedPensionPercentage = 0.50;
-                }
-                
-                // basePension (Net Pension Before Increases) uses the family-adjusted grossPension:
-                const commutedPension = roundToTwoDecimals(grossPension * commutedPensionPercentage);
-                const basePension = roundToTwoDecimals(grossPension - commutedPension);
-
-                // ----------------------------------------------------
-                // LOGIC for Medical Allowance Base (Unadjusted for Family Pension - B17 equivalent)
-                // This value is used if SOS >= 2015-07-01.
-                // ----------------------------------------------------
-                let medicalAllowanceBase_unadjusted = 0;
-                if (grossPensionPPO > 0) {
-                    // 1. Commuted Pension using UNADJUSTED grossPensionPPO
-                    const medicalCommutedPension = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage);
-                    // 2. Medical Allowance Base = Gross Pension PPO - Commuted Pension (from PPO)
-                    medicalAllowanceBase_unadjusted = roundToTwoDecimals(grossPensionPPO - medicalCommutedPension);
-                }
-                
-                const commutationAmount = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage * commutationFactor * 12);
-
-                const netValues = populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension);
-                
-                let finalPensionCurrent = basePension;
-                if (netValues.current.length > 0) {
-                    finalPensionCurrent = Math.max(basePension, ...netValues.current);
-                }
-                finalPensionCurrent = Math.ceil(finalPensionCurrent);
-
-                let finalPensionRestored = grossPension; 
-                if (netValues.restored.length > 0) {
-                    finalPensionRestored = Math.max(grossPension, ...netValues.restored);
-                }
-                finalPensionRestored = Math.ceil(finalPensionRestored);
-                
-                // ----------------------------------------------------
-                // Medical Allowance Final Calculation (Implementing IF($B$10>DATE(2015,6,30), B17, R17))
-                // ----------------------------------------------------
-                let medicalAllowance = 0;
-                
-                if (grossPensionPPO > 0 && sosDate) {
-                    const policyDate2015 = parseDate('2015-07-01');
-                    
-                    let baseForBPSCalculation = 0; 
-
-                    // R17 (Net Pension after 2010 Increase) - This value is pulled from the increases table.
-                    // NOTE: This value IS FAMILY-ADJUSTED, as per previous logic.
-                    // If Family Pension is selected, R17 reflects the family-adjusted 2010 net pension.
-                    const R17 = netValues.netByYearCurrent[2010] || medicalAllowanceBase_unadjusted;
-
-                    if (sosDate >= policyDate2015) {
-                        // IF TRUE: Use B17 (Unadjusted Net Pension Before Increases)
-                        baseForBPSCalculation = medicalAllowanceBase_unadjusted; 
-                    } else {
-                        // IF FALSE: Use R17 (Net Pension after 2010 Increase - Family Adjusted)
-                        baseForBPSCalculation = R17;
-                    }
-                    
-                    let reductionFactor = 0;
-
-                    if (!isNaN(bpsValue) && bpsValue >= 1 && bpsValue <= 22) {
-                        if (bpsValue <= 15) {
-                            reductionFactor = 0.25; // 25%
-                        } else { // 16 to 22
-                            reductionFactor = 0.20; // 20%
-                        }
-                        
-                        // Step 1: Apply BPS reduction to the selected base
-                        let calculatedAmount = baseForBPSCalculation * reductionFactor;
-                        
-                        // Step 2: Apply the additional 25% increase
-                        medicalAllowance = calculatedAmount * 1.25;
-                    } else {
-                        medicalAllowance = 0;
-                    }
-                    
-                    // Step 3: Apply Ceiling
-                    medicalAllowance = Math.ceil(medicalAllowance);
-                }
-                // ----------------------------------------------------
-
-                // NEW: Total Payable Calculations (Rounded to whole number, same as Pension)
-                const totalPayableCurrent = Math.ceil(finalPensionCurrent + medicalAllowance);
-                const totalPayableRestored = Math.ceil(finalPensionRestored + medicalAllowance);
-
-                document.getElementById('qs-output').textContent = `${roundedQS} Years`;
-                document.getElementById('age-at-sos-output').textContent = `${ageNextBirthday} Years`;
-                document.getElementById('commutation-factor-output').textContent = commutationFactor.toFixed(4);
-                document.getElementById('gross-pension-output').textContent = formatCurrency(grossPension);
-                document.getElementById('net-pension-pre-increase-output').textContent = formatCurrency(basePension);
-                document.getElementById('commuted-pension-output').textContent = formatCurrency(commutedPension);
-                document.getElementById('commutation-amount-output').textContent = formatCurrency(commutationAmount);
-                document.getElementById('pension-pm-current-output').textContent = formatCurrency(finalPensionCurrent, true);
-                document.getElementById('pension-pm-restored-output').textContent = formatCurrency(finalPensionRestored, true);
-                document.getElementById('medical-allowance-output').textContent = formatCurrency(medicalAllowance, true); // Updated to use new value
-
-                // NEW: Display Total Payable Fields
-                document.getElementById('total-payable-current-output').textContent = formatCurrency(totalPayableCurrent, true);
-                document.getElementById('total-payable-restored-output').textContent = formatCurrency(totalPayableRestored, true);
-                
-                const restorationOutputSpan = document.getElementById('restoration-date-output');
-                const restorationDateFormatted = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
-                restorationOutputSpan.textContent = restorationDateFormatted;
-                
-                if (restorationDate) {
-                    const today = parseDate(getTodayDateString());
-                    restorationOutputSpan.className = 'value'; 
-                    if (restorationDate > today) {
-                        restorationOutputSpan.classList.add('text-red-600', 'font-bold');
-                    } else {
-                        restorationOutputSpan.classList.add('text-green-600', 'font-bold', 'flashing');
-                    }
-                } else {
-                        restorationOutputSpan.className = 'value text-gray-800'; 
-                }
-                
-                let restorationAgeDisplay = 'N/A';
-                if (dobDate && restorationDate && restorationDate > dobDate) {
-                    let totalMonths = (restorationDate.getUTCFullYear() - dobDate.getUTCFullYear()) * 12;
-                    totalMonths -= dobDate.getUTCMonth();
-                    totalMonths += restorationDate.getUTCMonth();
-                    if (restorationDate.getUTCDate() < dobDate.getUTCDate()) {
-                        totalMonths--;
-                    }
-                    const restorationAgeYears = Math.floor(totalMonths / 12);
-                    const restorationAgeMonths = totalMonths % 12;
-                    let yearsString = `${restorationAgeYears} Years`;
-                    let monthsString = (restorationAgeMonths === 1) ? `, 1 Month` : (restorationAgeMonths > 1) ? `, ${restorationAgeMonths} Months` : '';
-                    restorationAgeDisplay = yearsString + monthsString;
-                }
-                document.getElementById('age-at-restoration-output').textContent = restorationAgeDisplay;
-
-                // RE-ADDED: Store raw calculated values for logging
-                currentCalculatedValues.pensionCurrent = totalPayableCurrent; // Store total payable
-                currentCalculatedValues.pensionRestored = totalPayableRestored; // Store total payable restored
-                currentCalculatedValues.restorationDate = restorationDateFormatted;
-                currentCalculatedValues.medicalAllowance = medicalAllowance; 
-                
-                // Trigger log if a valid calculation occurred (handled by checkInputEnabling)
-            } catch (error) {
-                console.error("Error in calculateAndDisplayAll:", error);
-            }
-        }
-        
-        function checkInputEnabling() {
+            // 2. Service & Personal Date Calculations
             const dobInput = document.getElementById('dob');
             const dojInput = document.getElementById('doj'); 
-            const sosInput = document.getElementById('sos');
+            const sosInput = document.getElementById('sos'); 
             const bpsInput = document.getElementById('bps'); // Added: BPS Input
-            const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
             const familyPensionInput = document.getElementById('family-pension');
-            const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
-            const payComponentsCard = document.getElementById('pay-components-card'); // New Pay Card
-            const payInputs = document.querySelectorAll('.pay-input');
+            
+            const dobDate = parseDate(dobInput.value);
+            const dojDate = parseDate(dojInput.value); 
+            const sosDate = parseDate(sosInput.value);
+            const bpsValue = parseInt(bpsInput.value); // Parse BPS value as integer
+            const isFamilyPension = familyPensionInput.value === 'Yes';
+            
+            document.getElementById('dob-display').textContent = formatDateDisplay(dobDate);
+            document.getElementById('doj-display').textContent = formatDateDisplay(dojDate); 
+            document.getElementById('sos-display').textContent = formatDateDisplay(sosDate);
 
-            const dobFilled = dobInput.value !== '';
-            const dojFilled = dojInput.value !== ''; 
-            const sosFilled = sosInput.value !== '';
-            const bpsFilled = bpsInput.value !== ''; 
-            const dateFieldsFilled = dobFilled && dojFilled && sosFilled;
+            let roundedQS = 0;
+            let ageNextBirthday = 0;
+            let commutationFactor = 0;
+            let restorationDate = null;
             
-            // Check link state and base enablement
-            const linkEnabled = linkCheckbox.checked;
-            const coreInputsEnabled = dateFieldsFilled && bpsFilled;
+            // Logic to calculate QS, Age, Factor, Restoration Date
+            if (dojDate && sosDate) { 
+                const serviceInMillis = sosDate - dojDate; 
+                const serviceInYearsDecimal = serviceInMillis / (1000 * 60 * 60 * 24 * 365.25);
+                roundedQS = Math.round(serviceInYearsDecimal);
+
+                // Apply 30-year cap for QS calculation
+                if (roundedQS > 30) {
+                    roundedQS = 30;
+                }
+
+                if (dobDate) {
+                    const sosPlusOneDay = new Date(sosDate);
+                    sosPlusOneDay.setUTCDate(sosPlusOneDay.getUTCDate() + 1);
+                    const ageAtSOSInYears = (sosPlusOneDay - dobDate) / (1000 * 60 * 60 * 24 * 365.25);
+                    ageNextBirthday = Math.ceil(ageAtSOSInYears);
+                }
+
+                let factorsToUse = null;
+                const policyDate2001 = parseDate('2001-12-01');
+                const policyDate1986 = parseDate('1986-07-01');
+                if (sosDate >= policyDate2001) factorsToUse = factors_2001_12_01;
+                else if (sosDate >= policyDate1986) factorsToUse = factors_1986_07_01;
+                else factorsToUse = factors_1966_07_01;
+                commutationFactor = factorsToUse[ageNextBirthday] || 0;
+
+                const roundedCommutationFactor = Math.round(commutationFactor);
+                
+                // NEW RESTORATION DATE LOGIC: SOS + 1 day + Commutation Years
+                const restorationBaseDate = new Date(sosDate);
+                restorationBaseDate.setUTCDate(restorationBaseDate.getUTCDate() + 1);
+                restorationDate = new Date(restorationBaseDate.getTime()); // Create a copy of base date
+                restorationDate.setUTCFullYear(restorationDate.getUTCFullYear() + roundedCommutationFactor);
+            }
             
-            // Gross Pension is read-only if linked, editable if unlinked.
-            const grossPensionEnabled = coreInputsEnabled; // Must be enabled if core fields are filled
-            grossPensionPPOInput.readOnly = linkEnabled;
-            grossPensionPPOInput.classList.toggle('manual-input', !linkEnabled);
-            grossPensionPPOInput.disabled = !coreInputsEnabled;
-            
-            // Pay component inputs are only enabled if core inputs are filled AND the link is active.
-            const payInputsEnabled = coreInputsEnabled && linkEnabled;
-            payInputs.forEach(input => {
-                input.disabled = !payInputsEnabled;
-            });
-            
-            // Toggle visibility/status of the Pay Components Card
-            if (payComponentsCard) {
-                payComponentsCard.style.display = linkEnabled ? 'block' : 'none';
+            // 3. Update Service Summary UI (ALWAYS update these, even if pension is 0)
+            document.getElementById('qs-output').textContent = `${roundedQS} Years`;
+            document.getElementById('age-at-sos-output').textContent = `${ageNextBirthday} Years`;
+            document.getElementById('commutation-factor-output').textContent = commutationFactor > 0 ? commutationFactor.toFixed(4) : "0";
+
+            const restorationOutputSpan = document.getElementById('restoration-date-output');
+            if (restorationDate) {
+                restorationOutputSpan.textContent = formatDateDisplay(restorationDate);
+                
+                const today = parseDate(getTodayDateString());
+                restorationOutputSpan.className = 'value'; 
+                if (restorationDate > today) {
+                    restorationOutputSpan.classList.add('text-red-600', 'font-bold');
+                } else {
+                    restorationOutputSpan.classList.add('text-green-600', 'font-bold', 'flashing');
+                }
+            } else {
+                restorationOutputSpan.textContent = "N/A";
+                restorationOutputSpan.className = 'value text-gray-800'; 
             }
 
-            // Check if Gross Pension field has a valid calculated/manual value > 0
-            const grossPensionValue = parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) || 0;
-            const grossPensionFilled = grossPensionValue > 0;
+            let restorationAgeDisplay = 'N/A';
+            if (dobDate && restorationDate && restorationDate > dobDate) {
+                let totalMonths = (restorationDate.getUTCFullYear() - dobDate.getUTCFullYear()) * 12;
+                totalMonths -= dobDate.getUTCMonth();
+                totalMonths += restorationDate.getUTCMonth();
+                if (restorationDate.getUTCDate() < dobDate.getUTCDate()) {
+                    totalMonths--;
+                }
+                const restorationAgeYears = Math.floor(totalMonths / 12);
+                const restorationAgeMonths = totalMonths % 12;
+                let yearsString = `${restorationAgeYears} Years`;
+                let monthsString = (restorationAgeMonths === 1) ? `, 1 Month` : (restorationAgeMonths > 1) ? `, ${restorationAgeMonths} Months` : '';
+                restorationAgeDisplay = yearsString + monthsString;
+            }
+            document.getElementById('age-at-restoration-output').textContent = restorationAgeDisplay;
 
-            familyPensionInput.disabled = !(coreInputsEnabled && grossPensionFilled); 
+
+            // 4. Financial Calculations (Only if Gross Pension > 0)
+            if (grossPensionPPO <= 0) {
+                // Clear Financial Output Fields only
+                document.getElementById('gross-pension-output').textContent = '-';
+                document.getElementById('net-pension-pre-increase-output').textContent = '-';
+                document.getElementById('commuted-pension-output').textContent = '-';
+                document.getElementById('commutation-amount-output').textContent = '-';
+                document.getElementById('pension-pm-current-output').textContent = '0';
+                document.getElementById('pension-pm-restored-output').textContent = '0';
+                document.getElementById('medical-allowance-output').textContent = '0';
+                document.getElementById('total-payable-current-output').textContent = '0';
+                document.getElementById('total-payable-restored-output').textContent = '0';
+                document.getElementById('increase-table-body').innerHTML = '';
+                
+                // Clear log timer
+                 if (logDebounceTimer) { clearTimeout(logDebounceTimer); logDebounceTimer = null; }
+                return;
+            }
+
+            // --- Proceed with Financials ---
             
-            // Recalculate if anything changed state (necessary for linked fields)
-            if (linkCheckbox.checked) {
-                calculateTotalPay();
+            let grossPension = grossPensionPPO;
+            if (isFamilyPension) {
+                // This is the main gross pension figure used for subsequent calculations (commutation, increases table)
+                grossPension = roundToTwoDecimals(grossPensionPPO * 0.75);
+            }
+
+            let commutedPensionPercentage = 0;
+            if (sosDate) {
+                const date2005 = parseDate('2005-06-30');
+                const date2001 = parseDate('2001-11-30');
+                if (sosDate > date2005) commutedPensionPercentage = 0.35;
+                else if (sosDate > date2001) commutedPensionPercentage = 0.40;
+                else commutedPensionPercentage = 0.50;
             }
             
-            calculateAndDisplayAll();
+            // basePension (Net Pension Before Increases) uses the family-adjusted grossPension:
+            const commutedPension = roundToTwoDecimals(grossPension * commutedPensionPercentage);
+            const basePension = roundToTwoDecimals(grossPension - commutedPension);
+
+            // ----------------------------------------------------
+            // LOGIC for Medical Allowance Base (Unadjusted for Family Pension - B17 equivalent)
+            // This value is used if SOS >= 2015-07-01.
+            // ----------------------------------------------------
+            let medicalAllowanceBase_unadjusted = 0;
+            if (grossPensionPPO > 0) {
+                // 1. Commuted Pension using UNADJUSTED grossPensionPPO
+                const medicalCommutedPension = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage);
+                // 2. Medical Allowance Base = Gross Pension PPO - Commuted Pension (from PPO)
+                medicalAllowanceBase_unadjusted = roundToTwoDecimals(grossPensionPPO - medicalCommutedPension);
+            }
+            
+            const commutationAmount = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage * commutationFactor * 12);
+
+            const netValues = populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension);
+            
+            let finalPensionCurrent = basePension;
+            if (netValues.current.length > 0) {
+                finalPensionCurrent = Math.max(basePension, ...netValues.current);
+            }
+            finalPensionCurrent = Math.ceil(finalPensionCurrent);
+
+            let finalPensionRestored = grossPension; 
+            if (netValues.restored.length > 0) {
+                finalPensionRestored = Math.max(grossPension, ...netValues.restored);
+            }
+            finalPensionRestored = Math.ceil(finalPensionRestored);
+            
+            // ----------------------------------------------------
+            // Medical Allowance Final Calculation (Implementing IF($B$10>DATE(2015,6,30), B17, R17))
+            // ----------------------------------------------------
+            let medicalAllowance = 0;
+            
+            if (grossPensionPPO > 0 && sosDate) {
+                const policyDate2015 = parseDate('2015-07-01');
+                
+                let baseForBPSCalculation = 0; 
+
+                // R17 (Net Pension after 2010 Increase) - This value is pulled from the increases table.
+                // NOTE: This value IS FAMILY-ADJUSTED, as per previous logic.
+                // If Family Pension is selected, R17 reflects the family-adjusted 2010 net pension.
+                const R17 = netValues.netByYearCurrent[2010] || medicalAllowanceBase_unadjusted;
+
+                if (sosDate >= policyDate2015) {
+                    // IF TRUE: Use B17 (Unadjusted Net Pension Before Increases)
+                    baseForBPSCalculation = medicalAllowanceBase_unadjusted; 
+                } else {
+                    // IF FALSE: Use R17 (Net Pension after 2010 Increase - Family Adjusted)
+                    baseForBPSCalculation = R17;
+                }
+                
+                let reductionFactor = 0;
+
+                if (!isNaN(bpsValue) && bpsValue >= 1 && bpsValue <= 22) {
+                    if (bpsValue <= 15) {
+                        reductionFactor = 0.25; // 25%
+                    } else { // 16 to 22
+                        reductionFactor = 0.20; // 20%
+                    }
+                    
+                    // Step 1: Apply BPS reduction to the selected base
+                    let calculatedAmount = baseForBPSCalculation * reductionFactor;
+                    
+                    // Step 2: Apply the additional 25% increase
+                    medicalAllowance = calculatedAmount * 1.25;
+                } else {
+                    medicalAllowance = 0;
+                }
+                
+                // Step 3: Apply Ceiling
+                medicalAllowance = Math.ceil(medicalAllowance);
+            }
+            // ----------------------------------------------------
+
+            // NEW: Total Payable Calculations (Rounded to whole number, same as Pension)
+            const totalPayableCurrent = Math.ceil(finalPensionCurrent + medicalAllowance);
+            const totalPayableRestored = Math.ceil(finalPensionRestored + medicalAllowance);
+
+            document.getElementById('gross-pension-output').textContent = formatCurrency(grossPension);
+            document.getElementById('net-pension-pre-increase-output').textContent = formatCurrency(basePension);
+            document.getElementById('commuted-pension-output').textContent = formatCurrency(commutedPension);
+            document.getElementById('commutation-amount-output').textContent = formatCurrency(commutationAmount);
+            document.getElementById('pension-pm-current-output').textContent = formatCurrency(finalPensionCurrent, true);
+            document.getElementById('pension-pm-restored-output').textContent = formatCurrency(finalPensionRestored, true);
+            document.getElementById('medical-allowance-output').textContent = formatCurrency(medicalAllowance, true); 
+
+            // NEW: Display Total Payable Fields
+            document.getElementById('total-payable-current-output').textContent = formatCurrency(totalPayableCurrent, true);
+            document.getElementById('total-payable-restored-output').textContent = formatCurrency(totalPayableRestored, true);
+            
+            // RE-ADDED: Store raw calculated values for logging
+            currentCalculatedValues.pensionCurrent = totalPayableCurrent; 
+            currentCalculatedValues.pensionRestored = totalPayableRestored; 
+            currentCalculatedValues.restorationDate = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
+            currentCalculatedValues.medicalAllowance = medicalAllowance; 
+            
+            // Trigger log if a valid calculation occurred
+            if (isSupabaseEnabled) {
+                clearTimeout(logDebounceTimer);
+                const dobInput = document.getElementById('dob');
+                
+                // Only set timer if all required fields are filled
+                if (dobInput.value && dojInput.value && sosInput.value && grossPensionPPO > 0) { 
+                    logDebounceTimer = setTimeout(() => {
+                        logCalculation('Input Change (Debounced)');
+                    }, LOG_DEBOUNCE_DELAY);
+                }
+            }
         }
         
         // --- Supabase Log Count Fetcher ---
@@ -1703,6 +1798,91 @@
                 console.error("Failed to fetch log count:", e);
                 logCountSpan.textContent = 'Error';
             }
+        }
+        
+        function checkInputEnabling() {
+            const dobInput = document.getElementById('dob');
+            const dojInput = document.getElementById('doj'); 
+            const sosInput = document.getElementById('sos');
+            const bpsInput = document.getElementById('bps'); // Added: BPS Input
+            const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
+            const familyPensionInput = document.getElementById('family-pension');
+            const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
+            const payComponentsCard = document.getElementById('pay-components-card'); // New Pay Card
+            const payInputs = document.querySelectorAll('.pay-input');
+            const nameInput = document.getElementById('pensioner-name');
+
+            // Check if name is filled
+            const nameFilled = nameInput.value.trim() !== '';
+            dobInput.disabled = !nameFilled;
+
+            // Check if DOB is filled
+            const dobFilled = dobInput.value !== '';
+            dojInput.disabled = !dobFilled;
+
+            // Check if DOJ is filled
+            const dojFilled = dojInput.value !== '';
+            sosInput.disabled = !dojFilled;
+
+            // Check if SOS is filled
+            const sosFilled = sosInput.value !== '';
+            bpsInput.disabled = !sosFilled;
+
+            // Check if BPS is filled
+            const bpsFilled = bpsInput.value !== '';
+            
+            // Enable gross pension and family pension if previous fields are filled
+            const coreInputsEnabled = nameFilled && dobFilled && dojFilled && sosFilled && bpsFilled;
+            
+            familyPensionInput.disabled = !coreInputsEnabled;
+            
+            // Check link state
+            const linkEnabled = linkCheckbox.checked;
+
+            // Enable Pay inputs if core inputs are ready AND link is enabled
+            const payInputsEnabled = coreInputsEnabled && linkEnabled;
+            payInputs.forEach(input => {
+                input.disabled = !payInputsEnabled;
+            });
+
+            // Gross Pension is read-only if linked, editable if unlinked but enabled
+            grossPensionPPOInput.readOnly = linkEnabled;
+            grossPensionPPOInput.classList.toggle('manual-input', !linkEnabled);
+            grossPensionPPOInput.disabled = !coreInputsEnabled;
+            
+            // Toggle visibility/status of the Pay Components Card
+            if (payComponentsCard) {
+                payComponentsCard.style.display = linkEnabled ? 'block' : 'none';
+            }
+            
+            // --- NEW LOGIC: Check if Penalty Card should be visible ---
+            const sosDate = parseDate(sosInput.value);
+            const penaltyCutoff = new Date('2024-09-09T00:00:00Z');
+            const isPenaltyApplicable = sosDate && sosDate > penaltyCutoff;
+            
+            const penaltyCard = document.getElementById('penalty-card');
+            const grossPensionLabel = document.getElementById('gross-pension-calc-label');
+            
+            if (penaltyCard) {
+                // UPDATED VISIBILITY LOGIC:
+                // Show only if applicable AND link is enabled. 
+                // Removed dependency on coreInputsEnabled to allow visibility even before all fields are filled.
+                penaltyCard.style.display = (isPenaltyApplicable && linkEnabled) ? 'block' : 'none';
+            }
+            
+            if (grossPensionLabel) {
+                // Update label based on applicability
+                grossPensionLabel.textContent = isPenaltyApplicable ? 'Gross Pension (Before Penalty)' : 'Gross Pension';
+            }
+            // ----------------------------------------------------------
+
+
+            // Recalculate if anything changed state (necessary for linked fields)
+            if (linkCheckbox.checked) {
+                calculateTotalPay();
+            }
+            
+            calculateAndDisplayAll();
         }
         
         // --- Supabase Visit Counter ---
@@ -1863,6 +2043,9 @@
                 }
             }
             // --- END FIX ---
+            
+            // --- Set Default Values (ensures they overwrite any HTML defaults) ---
+            // Note: Function removed in previous step to allow blank start
 
 
             // --- 2. Initialize the App (Core + Online Listeners) ---
@@ -1879,12 +2062,14 @@
             const pensionerNameInput = document.getElementById('pensioner-name'); // Name Input
             const payInputs = document.querySelectorAll('.pay-input'); // Pay component inputs
             const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
+            const pensionPenaltyInput = document.getElementById('pension-penalty'); // Penalty Input
 
             // Add listener for block letters on name input
             if (pensionerNameInput) {
                 pensionerNameInput.addEventListener('input', (e) => {
                     e.target.value = e.target.value.toUpperCase();
                     calculateAndDisplayAll(); // Recalculate on any input change
+                    checkInputEnabling(); // ADDED: Re-check enabling on name input
                 });
             }
             
@@ -1899,9 +2084,10 @@
 
             // Add listener to all date/select inputs
             allInputs.forEach(input => {
-                if(!input.classList.contains('pay-input') && input.id !== 'pensioner-name' && input.type !== 'checkbox') { // Ignore pay, name, and the new checkbox
+                if(!input.classList.contains('pay-input') && input.id !== 'pensioner-name' && input.type !== 'checkbox' && input.id !== 'pension-penalty') { // Ignore pay, name, penalty, and the new checkbox
                     input.addEventListener('input', () => { 
                         calculateAndDisplayAll();
+                        checkInputEnabling(); // Ensure subsequent fields are enabled as we type
                         
                         if (isSupabaseEnabled) {
                             clearTimeout(logDebounceTimer);
@@ -1914,7 +2100,6 @@
                                 }, LOG_DEBOUNCE_DELAY);
                             }
                         }
-                        checkInputEnabling();
                     });
                 }
             });
@@ -1929,6 +2114,11 @@
                 grossPensionPPOInput.addEventListener('input', formatGrossPensionInput);
             }
             
+            // Add listener for penalty input (uses formatGrossPensionInput to handle currency formatting and recalculation)
+            if (pensionPenaltyInput) {
+                 pensionPenaltyInput.addEventListener('input', formatGrossPensionInput);
+            }
+
             // Only attach these listeners if Supabase is on
             if (isSupabaseEnabled) {
                 clearLogBtn.addEventListener('click', openPasswordModal);
