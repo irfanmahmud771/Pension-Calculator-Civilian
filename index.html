@@ -1,0 +1,1965 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pension Calculation App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- RE-ADDED: Supabase JS Client for logging and counter -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .input-group {
+            margin-bottom: 1rem;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 0.25rem;
+            color: #4A5568;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .input-group input, .input-group select {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #CBD5E0;
+            border-radius: 0.375rem;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+        .input-group input:focus, .input-group select:focus {
+            outline: none;
+            border-color: #4299E1;
+            box-shadow: 0 0 0 1px #4299E1;
+        }
+        .input-group input[readonly] {
+            background-color: #F7FAFC;
+            cursor: not-allowed;
+            font-weight: 600;
+        }
+        /* Style for disabled inputs */
+        .input-group input:disabled, 
+        .input-group select:disabled,
+        .pension-stepper button:disabled {
+            background-color: #F7FAFC;
+            color: #A0AEC0;
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+        /* Add styling for manually enabled input */
+        .input-group input.manual-input:not([disabled]) {
+            background-color: #FFFBEB; /* yellow-50 */
+            cursor: text;
+        }
+
+
+        /* Styles for the pension input with stepper buttons (Removed functionality as Gross Pension is now auto-calculated) */
+        .pension-input-wrapper {
+            display: flex;
+            align-items: center;
+        }
+        .pension-input-wrapper input {
+            flex-grow: 1;
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+            /* Ensure it doesn't get too small */
+            min-width: 50px; 
+        }
+        .pension-stepper {
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .pension-stepper button {
+            width: 2.5rem; /* 40px */
+            height: 1.25rem; /* 20px */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #F1F5F9; /* slate-100 */
+            border: 1px solid #CBD5E0; /* cool-gray-300 */
+            color: #4A5568; /* cool-gray-600 */
+            font-weight: 600;
+            line-height: 1;
+            transition: background-color 0.15s ease-in-out;
+            /* Prevent text selection on rapid clicks */
+            user-select: none;
+        }
+        .pension-stepper button:hover:not(:disabled) {
+            background-color: #E2E8F0; /* slate-200 */
+        }
+        .pension-stepper button:first-child {
+            border-top-right-radius: 0.375rem;
+            border-bottom-width: 0.5px;
+            border-left-width: 0;
+        }
+        .pension-stepper button:last-child {
+            border-bottom-right-radius: 0.375rem;
+            border-top-width: 0.5px;
+            border-left-width: 0;
+        }
+        /* End new styles */
+
+        .output-group {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #E2E8F0;
+        }
+        .output-group:last-child {
+            border-bottom: none;
+        }
+        .output-group .label {
+            font-weight: 500;
+            color: #2D3748;
+        }
+        .output-group .value {
+            font-weight: 600;
+            /* Overridden by specific classes for restoration date */
+        }
+        .card {
+            background-color: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            padding: 1.5rem;
+        }
+        /* Flashing effect for past/current date */
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        .flashing {
+            animation: flash 1.5s infinite;
+        }
+        /* Custom styles for the increase table */
+        .increase-table-container {
+            overflow-x: auto;
+            max-width: 100%;
+        }
+        .increase-table {
+            width: 100%;
+            min-width: 1000px; /* Reduced from 1200px to shrink width */
+            border-collapse: collapse;
+            font-size: 0.8rem;
+        }
+        .increase-table th, .increase-table td {
+            padding: 8px 4px; /* Reduced horizontal padding */
+            border: 1px solid #000;
+            text-align: center;
+            vertical-align: middle;
+        }
+        .increase-table th {
+            background-color: #F7FAFC;
+            font-weight: 600;
+            color: #2D3748;
+            text-transform: uppercase;
+        }
+        .increase-table .header-group th {
+            padding: 12px 4px;
+        }
+        .increase-table .sub-header th {
+            font-weight: 500;
+        }
+        
+        /* New class to hide columns */
+        .hidden-column {
+            display: none;
+        }
+        
+        /* --- NEW: Password Modal Styles --- */
+        .modal-overlay {
+            position: fixed;
+            z-index: 1000;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* Hidden by default */
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            width: 90%;
+            max-width: 400px;
+            transform: scale(0.95);
+            transition: transform 0.3s ease;
+        }
+        .modal-overlay.visible {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-overlay.visible .modal-content {
+            transform: scale(1);
+        }
+        .modal-content .input-group {
+            margin-bottom: 1rem;
+        }
+        .modal-content .input-group label {
+            font-weight: 600;
+            color: #2D3748;
+        }
+        .modal-content .input-group input {
+            border-color: #A0AEC0;
+        }
+        .modal-content .input-group input:focus {
+            border-color: #3182CE;
+            box-shadow: 0 0 0 1px #3182CE;
+        }
+        /* --- End Modal Styles --- */
+
+
+        /* --- Mobile Responsive Styles --- */
+        @media (max-width: 768px) {
+            .logo-left {
+                display: none; /* Hide logo on mobile */
+            }
+            .container {
+                padding: 1rem; /* Reduce padding on mobile */
+            }
+            .card {
+                padding: 1rem; /* Reduce card padding */
+            }
+            header h1 {
+                font-size: 1.875rem; /* 30px */
+            }
+            header p {
+                font-size: 0.875rem; /* 14px */
+            }
+            .increase-table-container {
+                /* Allow table to be scrollable on mobile */
+                overflow-x: auto;
+            }
+            .increase-table {
+                min-width: 800px; /* Further reduce min-width for mobile */
+            }
+            /* Make final entitlement table stack */
+            .output-group {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 0.5rem 0;
+            }
+            .output-group .label {
+                margin-bottom: 0.25rem;
+                font-size: 0.875rem; /* 14px */
+            }
+            .output-group .value {
+                font-size: 1rem; /* 16px */
+                padding-left: 0.5rem; /* Indent value slightly */
+            }
+             /* Special handling for the header row in the final table */
+            .output-group.font-bold {
+                flex-direction: row; /* Keep header as row */
+                justify-content: space-between;
+            }
+            .output-group.font-bold .label {
+                 margin-bottom: 0;
+                 font-size: 1rem; /* 16px */
+                 width: auto !important; /* Override width */
+            }
+             /* Special handling for the 3-column rows in final table */
+             .output-group .w-1\/3 {
+                width: 100% !important; /* Make columns full width */
+                text-align: left !important; /* Align text left */
+                padding-left: 0.5rem; /* Indent */
+            }
+            .output-group .w-1\/3.label {
+                padding-left: 0; /* No indent for label */
+                font-size: 0.875rem; /* 14px */
+                margin-bottom: 0.25rem;
+            }
+            /* Hide the empty span in the header on mobile */
+            .output-group.font-bold .label.w-1\/3:first-child {
+                display: none;
+            }
+        }
+        /* --- End Mobile Styles --- */
+    </style>
+</head>
+<body class="bg-gray-50 t  ext-gray-800">
+
+    <!-- App Warning Bar -->
+    <div id="app-warning" class="p-4 text-center text-yellow-800 bg-yellow-100 rounded-lg m-4" style="display: none;"></div>
+
+    <div class="container mx-auto p-4 md:p-8 relative"> 
+        
+        <header class="text-center mb-8 mt-4 md:mt-0">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Pension Calculator Civilian</h1>
+            <p class="text-red-600 mt-1">(For Retirement date 01 July, 1986 to till now)</p>
+        </header>
+
+        <!-- Wrapper for print grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            
+            <!-- COLUMN 1: Inputs -->
+            <div class="space-y-8">
+                
+                <!-- Input Section: Service & Personal -->
+                <div class="card">
+                    <h2 class="card-title text-center font-bold text-xl">Input Details</h2>
+                    <form id="pension-form">
+                        <!-- Service Details -->
+                        <h3 class="font-semibold text-lg mt-6 mb-2 text-gray-600 border-b pb-2">Service & Personal</h3>
+                        
+                        <div class="input-group">
+                            <label for="pensioner-name">Name</label>
+                            <input type="text" id="pensioner-name" class="calc-input">
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            
+                            <div class="input-group">
+                                <label for="dob">Date of Birth (DOB)</label>
+                                <input type="date" id="dob" class="calc-input" value="">
+                                <div id="dob-display" class="text-xs text-gray-500 mt-1"></div>
+                            </div>
+                            <div class="input-group">
+                                <label for="doj">Date of Joining (DOJ)</label>
+                                <input type="date" id="doj" class="calc-input" value="">
+                                <div id="doj-display" class="text-xs text-gray-500 mt-1"></div>
+                            </div>
+                            <div class="input-group">
+                                <label for="sos">Date of Retirment (SOS)</label>
+                                <input type="date" id="sos" class="calc-input" value="">
+                                <div id="sos-display" class="text-xs text-gray-500 mt-1"></div>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="bps">BPS (Basic Pay Scale)</label>
+                                <select id="bps" class="calc-input">
+                                    <option value="" disabled selected>Select BPS</option>
+                                    <!-- Options will be populated by JavaScript in DOMContentLoaded -->
+                                </select>
+                            </div>
+                            
+                            <!-- MOVED: Family Pension is now after BPS -->
+                            <div class="input-group">
+                               <label for="family-pension">Family Pension</label>
+                                <select id="family-pension" class="calc-input">
+                                    <option value="No" selected>No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                            </div>
+                            
+                            <!-- UPDATED: Gross Pension field with toggle -->
+                            <div class="input-group">
+                                <label for="gross-pension-ppo" class="flex justify-between items-center">
+                                    Gross Pension 
+                                    <span class="flex items-center text-sm font-normal text-gray-500">
+                                        Auto Link: 
+                                        <input type="checkbox" id="link-gross-pension" checked class="ml-2 form-checkbox h-4 w-4 text-blue-600">
+                                    </span>
+                                </label>
+                                <div class="pension-input-wrapper">
+                                    <input type="text" id="gross-pension-ppo" class="calc-input" readonly>
+                                </div>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- NEW CARD: Pay Components - Visibility controlled by JS toggle -->
+                <div class="card" id="pay-components-card">
+                    <h3 class="font-semibold text-lg mb-4 text-gray-600 border-b pb-2">Pay Components (for Gross Pension)</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        
+                        <div class="input-group">
+                            <label for="basic-pay">Basic Pay</label>
+                            <input type="text" id="basic-pay" class="pay-input calc-input" min="0">
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="personnel-pay">Personnel Pay</label>
+                            <input type="text" id="personnel-pay" class="pay-input calc-input" min="0">
+                        </div>
+
+                        <div class="input-group">
+                            <label for="qualification-pay">Qualification Pay</label>
+                            <input type="text" id="qualification-pay" class="pay-input calc-input" min="0">
+                        </div>
+                        
+                        <div class="input-group">
+                            <label for="other-pay">Other Pay</label>
+                            <input type="text" id="other-pay" class="pay-input calc-input" min="0">
+                        </div>
+                        
+                        <div class="input-group md:col-span-2 pt-2 border-t mt-4">
+                            <label for="total-pay" class="font-bold text-gray-700">Total Pay</label>
+                            <!-- Font size is kept standard to match other input fields -->
+                            <input type="text" id="total-pay" class="calc-input bg-gray-50" readonly>
+                        </div>
+
+                    </div>
+                </div>
+                <!-- END NEW CARD -->
+
+            </div>
+            <!-- END COLUMN 1 -->
+
+            <!-- COLUMN 2: Output Section -->
+            <div class="card">
+                <h2 class="card-title text-center font-bold text-xl py-4">Calculated Results</h2>
+                
+                <h3 class="font-semibold text-lg mt-6 mb-2 text-gray-600 border-b pb-2">Service Summary</h3>
+                <div class="mt-4 space-y-2">
+                    <div class="output-group">
+                        <span class="label">Qualifying Service (QS)</span>
+                        <span class="value text-gray-800" id="qs-output">0 Years</span>
+                    </div>
+                    <div class="output-group">
+                        <span class="label">Age on next Birthday</span>
+                        <span class="value text-gray-800" id="age-at-sos-output">0 Years</span>
+                    </div>
+                     <div class="output-group">
+                        <span class="label">Commutation Purchase Value</span>
+                        <span class="value text-gray-800" id="commutation-factor-output">0</span>
+                    </div>
+                </div>
+                
+                <h3 class="font-semibold text-lg mt-6 mb-2 text-gray-600 border-b pb-2">Pension Details</h3>
+                 <div class="mt-4 space-y-2">
+                    <div class="output-group">
+                        <span class="label">Gross Pension</span>
+                        <span class="value text-gray-800" id="gross-pension-output">0</span>
+                    </div>
+                    <div class="output-group">
+                        <span class="label">Net Pension (Before Increases)</span>
+                        <span class="value text-gray-800" id="net-pension-pre-increase-output">0</span>
+                    </div>
+                    <div class="output-group">
+                        <span class="label">Commuted Pension</span>
+                        <span class="value text-gray-800" id="commuted-pension-output">0</span>
+                    </div>
+                     <div class="output-group">
+                        <span class="label">Commutation Amount</span>
+                        <span class="value text-gray-800" id="commutation-amount-output">0</span>
+                    </div>
+                 </div>
+
+                <!-- This section remains visible on screen -->
+                <div>
+                    <h3 class="font-semibold text-lg mt-6 mb-2 text-gray-600 border-b pb-2">Final Pension After Increases</h3>
+                     <div class="mt-4 space-y-2"> 
+                        <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Pension (Current)</span>
+                            <span class="value w-1/3 text-right text-gray-800" id="pension-pm-current-output">0</span>
+                        </div>
+                        <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Pension (After Restoration)</span>
+                            <span class="value w-1/3 text-right text-gray-800" id="pension-pm-restored-output">0</span>
+                        </div>
+                        <!-- Medical Allowance Field -->
+                         <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Medical Allowance</span>
+                            <span class="value w-1/3 text-right text-gray-800" id="medical-allowance-output">0</span>
+                        </div>
+                        
+                        <!-- NEW: Total Payable Fields -->
+                        <div class="output-group font-bold bg-gray-100 rounded-md">
+                            <span class="label w-1/3 whitespace-nowrap text-gray-700">Total Payable (Current)</span>
+                            <span class="value w-1/3 text-right text-blue-700" id="total-payable-current-output">0</span>
+                        </div>
+                        <div class="output-group font-bold bg-gray-100 rounded-md">
+                            <span class="label w-1/3 whitespace-nowrap text-gray-700">Total Payable (Restored)</span>
+                            <span class="value w-1/3 text-right text-green-700" id="total-payable-restored-output">0</span>
+                        </div>
+                        <!-- End NEW Total Payable Fields -->
+                        
+                         <div class="output-group pt-4"> 
+                            <span class="label w-1/3 whitespace-nowrap">Pension Restoration Date</span>
+                            <span class="value text-right" id="restoration-date-output"></span>
+                        </div>
+                        <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Age on Pension Restoration</span>
+                            <span class="value text-gray-800 text-right" id="age-at-restoration-output">0 Years</span>
+                        </div>
+                     </div>
+                </div>
+            </div>
+            <!-- END COLUMN 2 -->
+        </div>
+
+        <!-- Pension Increase Calculations Table -->
+        <div class="card mt-8">
+            <h2 class="card-title text-center font-bold text-xl mb-4">Pension Increase Calculations</h2>
+            <div class="increase-table-container">
+                <table class="increase-table">
+                    <thead>
+                        <tr class="header-group">
+                            <th rowspan="2" class="bg-blue-100 text-blue-600">Increase Year</th>
+                            <th rowspan="2" class="bg-blue-100 text-blue-600">%age</th>
+                            <th colspan="3" class="bg-blue-200 text-blue-700">Current</th>
+                            <th colspan="3" class="bg-green-200 text-green-700">After Restoration</th>
+                            <!-- Hidden columns -->
+                            <th rowspan="2" class="bg-blue-100 text-blue-600 hidden-column">Entitled</th>
+                            <th rowspan="2" class="bg-blue-100 text-blue-600 hidden-column">From</th>
+                            <th rowspan="2" class="bg-blue-100 text-blue-600 hidden-column">To</th>
+                            <th colspan="2" class="bg-cyan-200 text-cyan-700 hidden-column">Minimum Pension</th>
+                        </tr>
+                        <tr classs="sub-header">
+                            <th>Base Line</th>
+                            <th>Increase</th>
+                            <th>Net</th>
+                            <th>Base Line</th>
+                            <th>Increase</th>
+                            <th>Net</th>
+                            <!-- Hidden sub-headers -->
+                            <th class="hidden-column">Self</th>
+                            <th class="hidden-column">Family</th>
+                        </tr>
+                    </thead>
+                    <tbody id="increase-table-body">
+                        <!-- Rows populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Total Logs and Total Visits Display -->
+        <div class="flex justify-between mt-4" id="log-counters-wrapper">
+             <!-- MOVED: Logs counter is left-aligned by justify-between -->
+             <p id="log-counter-wrapper" class="text-sm font-medium text-gray-600">Total Logs: <span id="log-count" class="font-bold text-gray-800">0</span></p>
+             <!-- Visits counter is right-aligned by justify-between -->
+             <p id="visit-counter-wrapper" class="text-sm font-medium text-gray-600">Total Visits: <span id="visit-count" class="font-bold text-gray-800">0</span></p>
+        </div>
+
+        <!-- Calculation Log -->
+        <div class="card mt-2" id="log-wrapper">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="card-title font-bold text-xl">Calculation Log</h2>
+                <button id="clear-log-btn" class="text-sm bg-red-500 hover:bg-red-600 text-white font-medium py-1 px-3 rounded-lg transition-colors">
+                    Clear Log
+                </button>
+            </div>
+            <div id="log-container" class="h-48 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs font-mono">
+                <span class="text-gray-400">Loading log...</span>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Password Modal HTML -->
+    <div id="password-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-4">Enter Password</h3>
+            <div class="input-group">
+                <label for="password-input">Password</label>
+                <input type="password" id="password-input" class="w-full" placeholder="Enter password to clear log">
+            </div>
+            <p id="password-error" class="text-red-500 text-sm mb-4" style="display: none;">Incorrect password. Please try again.</p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-clear-btn" type="button" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button id="confirm-clear-btn" type="button" class="text-sm bg-red-500 hover:bg-red-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- End Modal -->
+
+
+    <!-- ====================================================================== -->
+    <!-- SUPABASE SCRIPT -->
+    <!-- ====================================================================== -->
+    <script type="module">
+        // RE-ADDED: Import Supabase createClient
+        import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+        // --- UPDATED: SUPABASE URL AND ANON KEY (Credentials added) ---
+        const SUPABASE_URL = "https://bxebqrmrczgbybtfihvz.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ4ZWJxcm1yY3pnYnlidGZpaHZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM2MDEyNjcsImV4cCI6MjA3OTE3NzI2N30.biZzBNk_j_VRlSbYcWAqlJbdbdU_JoBfN2-hbsSTE3o";
+        // --------------------------------------------------
+
+        // --- App State Variables ---
+        let supabaseClient;
+        let isSupabaseEnabled = false;
+
+        // Debounce timer for logging
+        let logDebounceTimer = null;
+        // RESTORED: Change debounce delay back to 10000ms (10 seconds)
+        const LOG_DEBOUNCE_DELAY = 10000; 
+
+        // NEW: Store calculated values for logging
+        let currentCalculatedValues = { 
+            pensionCurrent: 0, 
+            pensionRestored: 0, 
+            restorationDate: 'N/A',
+            medicalAllowance: 0 
+        };
+
+        // --- 1. HELPER FUNCTIONS ---
+
+        const getTodayDateString = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
+
+        const todayDateString = getTodayDateString(); 
+
+        const roundToTwoDecimals = (num) => {
+            if (typeof num !== 'number' || isNaN(num)) return 0;
+            const epsilon = 0.0000001; 
+            return Math.round((num + epsilon) * 100) / 100;
+        }
+        
+        const roundToNearestWhole = (num) => {
+            if (typeof num !== 'number' || isNaN(num)) return 0;
+            const rounded = Math.round(num);
+            return rounded;
+        }
+
+        const formatCurrency = (value, roundToWhole = false, forTable = false) => {
+            const numericValue = parseFloat(value);
+            if (isNaN(numericValue) || numericValue === 0) return forTable ? '0.00' : '-';
+            
+            let roundedValue;
+            let minimumFractionDigits;
+            let maximumFractionDigits;
+
+            if (roundToWhole) {
+                // We use Math.ceil() elsewhere for final pension figures, but keep standard rounding for formatter helper
+                roundedValue = Math.ceil(numericValue); // Use ceil for final payable figures
+                minimumFractionDigits = 0;
+                maximumFractionDigits = 0;
+            } else {
+                roundedValue = roundToTwoDecimals(numericValue);
+                minimumFractionDigits = 2;
+                maximumFractionDigits = 2;
+            }
+            
+            const prefix = forTable ? '' : 'Rs. ';
+            return prefix + roundedValue.toLocaleString('en-IN', { minimumFractionDigits, maximumFractionDigits });
+        };
+        
+        const parseDate = (dateString) => {
+            if (!dateString) return null;
+            const date = new Date(dateString + 'T00:00:00Z');
+            return isNaN(date.getTime()) ? null : date;
+        };
+
+        const formatDateDisplay = (date) => {
+            if (!date) return 'N/A';
+            const options = { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' };
+            return date.toLocaleString('en-GB', options).replace(/ /g, '-').toUpperCase();
+        };
+        
+        const formatDateTable = (dateString) => {
+            const parts = dateString.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                const year = parts[0];
+                const month = parseInt(parts[1]) - 1;
+                const day = parts[2];
+                const dateForDisplay = new Date(Date.UTC(year, month, day));
+                return dateForDisplay.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' }).replace(/ /g, '-').toUpperCase();
+            }
+            return dateString;
+        };
+        
+        const formatDateForLog = (dateString) => {
+            if (!dateString) return 'N/A';
+            const parts = dateString.split('-');
+            if (parts.length === 3 && parts[0].length === 4) {
+                return `${parts[2]}-${parts[1]}-${parts[0]}`;
+            }
+            return dateString;
+        };
+        
+        // RE-ADDED: Format visit count to K/M
+        const formatVisitCount = (num) => {
+            if (!num || num < 1000) {
+                return num || 0;
+            } else if (num < 1000000) {
+                return (num / 1000).toFixed(num % 1000 === 0 ? 0 : 1) + 'K';
+            } else {
+                return (num / 1000000).toFixed(num % 1000000 === 0 ? 0 : 1) + 'M';
+            }
+        };
+
+
+        // --- 2. DATA CONSTANTS (Remain unchanged) ---
+
+        const pensionData = [
+            { age: 20, val_2001: 40.5043, val_1986: 50.6304, val_1966: 24.265 }, { age: 21, val_2001: 39.7341, val_1986: 49.6676, val_1966: 24.061 }, { age: 22, val_2001: 38.9653, val_1986: 48.7066, val_1966: 23.853 }, { age: 23, val_2001: 38.1974, val_1986: 47.7467, val_1966: 23.64 }, { age: 24, val_2001: 37.4307, val_1986: 46.7884, val_1966: 23.424 }, { age: 25, val_2001: 36.6651, val_1986: 45.8314, val_1966: 23.203 }, { age: 26, val_2001: 35.9006, val_1986: 44.8758, val_1966: 22.978 }, { age: 27, val_2001: 35.1372, val_1986: 43.9215, val_1966: 22.747 }, { age: 28, val_2001: 34.375, val_1986: 42.9688, val_1966: 22.513 }, { age: 29, val_2001: 33.6143, val_1986: 42.0179, val_1966: 22.273 }, { age: 30, val_2001: 32.8071, val_1986: 41.0089, val_1966: 22.028 }, { age: 31, val_2001: 32.0974, val_1986: 40.1218, val_1966: 21.077 }, { age: 32, val_2001: 31.3412, val_1986: 39.1767, val_1966: 21.522 }, { age: 33, val_2001: 30.5869, val_1986: 38.2336, val_1966: 21.26 }, { age: 34, val_2001: 29.8343, val_1986: 37.2929, val_1966: 20.993 }, { age: 35, val_2001: 29.0841, val_1986: 36.3551, val_1966: 20.72 }, { age: 36, val_2001: 28.3362, val_1986: 35.4203, val_1966: 20.442 }, { age: 37, val_2001: 27.5908, val_1986: 34.4885, val_1966: 20.157 }, { age: 38, val_2001: 26.8482, val_1986: 33.5603, val_1966: 19.867 }, { age: 39, val_2001: 26.1009, val_1986: 32.6361, val_1966: 19.57 }, { age: 40, val_2001: 25.3728, val_1986: 31.716, val_1966: 19.267 }, { age: 41, val_2001: 24.6406, val_1986: 30.8007, val_1966: 18.956 }, { age: 42, val_2001: 23.9126, val_1986: 29.8907, val_1966: 18.641 }, { age: 43, val_2001: 23.184, val_1986: 28.98, val_1966: 18.318 }, { age: 44, val_2001: 22.4713, val_1986: 28.0891, val_1966: 17.988 }, { age: 45, val_2001: 21.7592, val_1986: 27.199, val_1966: 17.65 }, { age: 46, val_2001: 21.0538, val_1986: 26.3172, val_1966: 17.307 }, { age: 47, val_2001: 20.3555, val_1986: 25.4444, val_1966: 16.956 }, { age: 48, val_2001: 19.6653, val_1986: 24.5816, val_1966: 16.596 }, { age: 49, val_2001: 18.9841, val_1986: 23.7301, val_1966: 16.231 }, { age: 50, val_2001: 18.3129, val_1986: 22.8911, val_1966: 15.859 }, { age: 51, val_2001: 17.6526, val_1986: 22.0658, val_1966: 15.481 }, { age: 52, val_2001: 17.005, val_1986: 21.2563, val_1966: 15.096 }, { age: 53, val_2001: 16.371, val_1986: 20.638, val_1966: 14.707 }, { age: 54, val_2001: 15.7517, val_1986: 19.6896, val_1966: 14.313 }, { age: 55, val_2001: 15.1478, val_1986: 18.9348, val_1966: 13.915 }, { age: 56, val_2001: 14.5602, val_1986: 18.2002, val_1966: 13.513 }, { age: 57, val_2001: 13.9888, val_1986: 17.486, val_1966: 13.109 }, { age: 58, val_2001: 13.434, val_1986: 16.7925, val_1966: 12.702 }, { age: 59, val_2001: 12.8953, val_1986: 16.1191, val_1966: 12.294 }, { age: 60, val_2001: 12.3719, val_1986: 15.4649, val_1966: 11.886 }, { age: 61, val_2001: 11.8632, val_1986: 14.829, val_1966: 11.497 }, { age: 62, val_2001: 11.3684, val_1986: 14.2105, val_1966: 11.104 }, { age: 63, val_2001: 10.8872, val_1986: 13.609, val_1966: 10.713 }, { age: 64, val_2001: 10.4191, val_1986: 13.0239, val_1966: 10.327 }, { age: 65, val_2001: 9.9636, val_1986: 12.4549, val_1966: 9.946 }, { age: 66, val_2001: 9.5214, val_1986: 11.9017, val_1966: 9.57 }, { age: 67, val_2001: 9.0914, val_1986: 11.3643, val_1966: 9.2 }, { age: 68, val_2001: 8.6742, val_1986: 10.5428, val_1966: 8.836 }, { age: 69, val_2001: 8.2697, val_1986: 10.3371, val_1966: 8.478 }, { age: 70, val_2001: 7.8778, val_1986: 9.8472, val_1966: 8.127 }, { age: 71, val_2001: 7.4983, val_1986: 9.3729, val_1966: 7.783 }, { age: 72, val_2001: 7.1314, val_1986: 8.9142, val_1966: 7.448 }, { age: 73, val_2001: 6.7766, val_1986: 8.4708, val_1966: 7.121 }, { age: 74, val_2001: 6.4342, val_1986: 8.0427, val_1966: 6.802 }, { age: 75, val_2001: 6.1039, val_1986: 7.6299, val_1966: 6.494 }, { age: 76, val_2001: 5.7858, val_1986: 7.2322, val_1966: 6.194 }, { age: 77, val_2001: 5.4797, val_1986: 6.8496, val_1966: 5.906 }, { age: 78, val_2001: 5.1854, val_1986: 6.4818, val_1966: 5.627 }, { age: 79, val_2001: 4.903, val_1986: 6.1284, val_1966: 5.364 }, { age: 80, val_2001: 4.6321, val_1986: 5.7901, val_1966: 5.104 }
+        ];
+        
+        const factors_2001_12_01 = {};
+        const factors_1986_07_01 = {};
+        const factors_1966_07_01 = {};
+        pensionData.forEach(item => {
+            factors_2001_12_01[item.age] = item.val_2001;
+            factors_1986_07_01[item.age] = item.val_1986;
+            factors_1966_07_01[item.age] = item.val_1966;
+        });
+        
+        const minPensionData = {
+            1988: { self: 300.00, family: 150.00 }, 2008: { self: 2000.00, family: 1000.00 }, 2010: { self: 3000.00, family: 2250.00 }, 2013: { self: 5000.00, family: 3750.00 }, 2014: { self: 6000.00, family: 4500.00 }, 2018: { self: 10000.00, family: 7500.00 }, 2023: { self: 12000.00, family: 9000.00 }
+        };
+
+        const pensionIncreases = [
+            { year: 1987, percentage: '4%', from: '1987-06-30', to: '1987-06-30' }, { year: 1988, percentage: '7%', from: '1988-06-30', to: '1988-06-30' }, { year: 1990, percentage: '10%', from: '1990-06-30', to: '1990-06-30' }, { year: 1991, percentage: 'CONDITIONAL', from: '1991-06-30', to: '1991-06-30' }, { year: 1995, percentage: 'CONDITIONAL', from: '1995-07-01', to: '1995-07-01' }, { year: 1997, percentage: '10%', from: '1997-02-28', to: '1997-02-28' }, { year: 1999, percentage: '25%', from: '1999-07-01', to: '2001-11-30' }, { year: 2001, percentage: 'CONDITIONAL', from: '2001-11-30', to: '2001-11-30' }, { year: 2003, percentage: '15%', from: '2003-07-01', to: '2005-06-30' }, { year: 2004, percentage: 'CONDITIONAL', from: '2004-07-01', to: '2005-06-30' }, { year: 2005, percentage: '10%', from: '2005-07-01', to: '2011-06-30' }, { year: 2006, percentage: 'CONDITIONAL', from: '2006-07-01', to: '2011-06-30' }, { year: 2007, percentage: 'CONDITIONAL', from: '2007-07-01', to: '2007-07-01' }, { year: 2008, percentage: '20%', from: '2008-07-01', to: '2008-07-01' }, { year: 2009, percentage: 'CONDITIONAL', from: '2009-07-01', to: '2011-06-30' }, { year: 2010, percentage: 'CONDITIONAL', from: '2010-07-01', to: '2017-06-30' }, { year: 2011, percentage: 'CONDITIONAL', from: '2011-07-01', to: todayDateString }, { year: 2012, percentage: '20%', from: '2012-07-01', to: '2015-06-30' }, { year: 2013, percentage: '10%', from: '2013-07-01', to: '2016-06-30' }, { year: 2014, percentage: '10%', from: '2014-07-01', to: '2016-06-30' }, { year: 2015, percentage: '7.5%', from: '2012-07-01', to: todayDateString }, { year: 2016, percentage: '10%', from: '2016-07-01', to: '2022-06-30' }, { year: 2017, percentage: '10%', from: '2017-07-01', to: '2022-06-30' }, { year: 2018, percentage: '10%', from: '2018-07-01', to: '2022-06-30' }, { year: 2019, percentage: '10%', from: '2019-07-01', to: '2022-06-30' }, { year: 2021, percentage: '10%', from: '2021-07-01', to: '2022-06-30' }, { year: 2022, percentage: '15%', from: '2022-07-01', to: todayDateString }, { year: 2023, percentage: '17.50%', from: '2023-07-01', to: todayDateString }, { year: 2024, percentage: '15%', from: '2024-07-01', to: todayDateString }, { year: 2025, percentage: '7%', from: '2025-07-01', to: todayDateString } 
+        ];
+
+        
+        // --- 3. CORE CALCULATION LOGIC (Functions) ---
+        
+        // RE-ADDED: Log related functions
+        async function renderLog(logArray) {
+            const logContainer = document.getElementById('log-container');
+            if (!logContainer) return;
+
+            if (logArray.length === 0) {
+                logContainer.innerHTML = '<span class="text-gray-400">Log starts empty...</span>';
+                return;
+            }
+
+            let logHTML = '';
+            for (const entry of logArray) {
+                const log_dob_display = formatDateForLog(entry.dob_raw);
+                const log_doj_display = formatDateForLog(entry.doj_raw); 
+                const log_sos_display = formatDateForLog(entry.sos_raw);
+                
+                const pensionRaw = entry.pension_raw || '0';
+                const parts = pensionRaw.split('.');
+                let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+                
+                let log_pension_display = integerPart;
+                if (decimalPart) log_pension_display += '.' + decimalPart;
+                if (parseFloat(pensionRaw) === 0) log_pension_display = '0';
+                if (entry.pension_raw === '') log_pension_display = 'N/A';
+                
+                // Get the calculated numeric values directly from the stored number fields (pension_current/restored)
+                const pensionCurrent = Math.ceil(parseFloat(entry.pension_current) || 0);
+                const pensionRestored = Math.ceil(parseFloat(entry.pension_restored) || 0);
+
+                // FIX: Read from all-lowercase properties
+                logHTML += `<div class="p-2 border-b border-gray-200"><strong>[${entry.displaytimestamp}] ${entry.triggersource}</strong><br>
+                    <strong>Name:</strong> ${entry.pensioner_name || 'N/A'}, 
+                    <strong>DOB:</strong> ${log_dob_display}, 
+                    <strong>DOJ:</strong> ${log_doj_display}, 
+                    <strong>SOS:</strong> ${log_sos_display},
+                    <strong>BPS:</strong> ${entry.bps || 'N/A'}<br>
+                    <strong>Gross Pension:</strong> ${log_pension_display}, 
+                    <strong>Family:</strong> ${entry.family}
+                    <br>
+                    <!-- NEW: Added calculated values in blue -->
+                    <strong class="text-blue-600">
+                        Payable Current: Rs. ${pensionCurrent.toLocaleString('en-IN')}, 
+                        Payable Restored: Rs. ${pensionRestored.toLocaleString('en-IN')}, 
+                        Date: ${entry.restoration_date || 'N/A'}
+                    </strong>
+                    <br>
+                    <button 
+                        class="load-log-btn text-xs bg-blue-500 hover:bg-blue-600 text-white font-medium py-1 px-2 rounded-lg transition-colors mt-2"
+                        data-name="${entry.pensioner_name || ''}"
+                        data-dob="${entry.dob_raw || ''}"
+                        data-doj="${entry.doj_raw || ''}"
+                        data-sos="${entry.sos_raw || ''}"
+                        data-bps="${entry.bps || ''}"
+                        data-pension="${entry.pension_raw || '0'}"
+                        data-family="${entry.family}">
+                        Load this Data
+                    </button>
+                </div>`;
+            }
+            logContainer.innerHTML = logHTML;
+        }
+
+        // --- Supabase Log Function (with duplicate checking) ---
+        async function logCalculation(triggerSource) {
+            if (!isSupabaseEnabled) return; 
+
+            const pensionerNameInput = document.getElementById('pensioner-name');
+            const dobInput = document.getElementById('dob');
+            const dojInput = document.getElementById('doj'); 
+            const sosInput = document.getElementById('sos');
+            const bpsInput = document.getElementById('bps'); // Added: BPS Input
+            const grossPensionInput = document.getElementById('gross-pension-ppo');
+            const familyPensionInput = document.getElementById('family-pension');
+
+            const totalPayableCurrentOutput = document.getElementById('total-payable-current-output');
+            const totalPayableRestoredOutput = document.getElementById('total-payable-restored-output');
+            const restorationDateOutput = document.getElementById('restoration-date-output');
+
+            const log_pensioner_name = pensionerNameInput.value;
+            const log_dob_raw = dobInput.value;
+            const log_doj_raw = dojInput.value; 
+            const log_sos_raw = sosInput.value;
+            const log_bps = bpsInput.value; // Added: BPS Value
+            const log_pension_raw = grossPensionInput.value.replace(/,/g, '') || '0';
+            const log_family = familyPensionInput.value;
+            
+            // Get raw numerical values for outputs - FIX: Only keep digits for whole number parsing
+            const payableCurrentRawText = totalPayableCurrentOutput.textContent.replace(/[^0-9]/g, '');
+            const payableRestoredRawText = totalPayableRestoredOutput.textContent.replace(/[^0-9]/g, '');
+            
+            const payableCurrentRaw = parseFloat(payableCurrentRawText) || 0;
+            const payableRestoredRaw = parseFloat(payableRestoredRawText) || 0;
+            const restorationDateRaw = restorationDateOutput.textContent;
+
+
+            const now = new Date();
+            const day = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const year = now.getFullYear();
+            const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
+            // FIX: Use all-lowercase keys to match the database
+            const logEntry = {
+                // created_at is added automatically by Supabase
+                displaytimestamp: `${day}-${month}-${year} ${time}`,
+                triggersource: triggerSource,
+                
+                // Input Fields
+                pensioner_name: log_pensioner_name,
+                dob_raw: log_dob_raw,
+                doj_raw: log_doj_raw, 
+                sos_raw: log_sos_raw,
+                bps: log_bps, // Added: BPS Field
+                family: log_family,
+                pension_raw: log_pension_raw,
+                
+                // Output Fields (Total Payable is calculated after increases/medical)
+                pension_current: payableCurrentRaw, // Stored as NUMERIC
+                pension_restored: payableRestoredRaw, // Stored as NUMERIC
+                restoration_date: restorationDateRaw,
+            };
+
+            try {
+                // 1. Check for and delete duplicates
+                const { error: deleteError } = await supabaseClient
+                    .from('logs')
+                    .delete()
+                    .match({
+                        dob_raw: log_dob_raw,
+                        doj_raw: log_doj_raw, 
+                        sos_raw: log_sos_raw,
+                        bps: log_bps, 
+                        pension_raw: log_pension_raw,
+                        family: log_family,
+                        // Match on calculated outputs as well
+                        pension_current: payableCurrentRaw,
+                        pension_restored: payableRestoredRaw,
+                        restoration_date: restorationDateRaw,
+                    });
+
+                if (deleteError) {
+                    console.warn("Error checking/deleting duplicate log:", deleteError);
+                    // Don't stop, proceed to insert anyway
+                }
+
+                // 2. Insert the new log entry
+                const { error: insertError } = await supabaseClient.from('logs').insert(logEntry);
+                if (insertError) {
+                    throw insertError;
+                }
+                console.log("Log entry saved (or refreshed):", logEntry);
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        }
+        
+        function openPasswordModal() {
+            const passwordModal = document.getElementById('password-modal');
+            const passwordInput = document.getElementById('password-input');
+            const passwordError = document.getElementById('password-error');
+            passwordInput.value = '';
+            passwordError.style.display = 'none';
+            passwordModal.classList.add('visible');
+            passwordInput.focus();
+        }
+
+        function closePasswordModal() {
+            const passwordModal = document.getElementById('password-modal');
+            passwordModal.classList.remove('visible');
+        }
+
+        // --- Supabase Clear Log Function ---
+        async function confirmClearLog() {
+            if (!isSupabaseEnabled) return;
+
+            const passwordInput = document.getElementById('password-input');
+            const passwordError = document.getElementById('password-error');
+            const password = passwordInput.value;
+
+            if (password === 'Smile@786') {
+                passwordError.style.display = 'none';
+                try {
+                    // FIX: Use .delete() with a filter instead of RPC
+                    // This satisfies the "DELETE requires a WHERE clause" rule
+                    const { error } = await supabaseClient
+                        .from('logs')
+                        .delete()
+                        .neq('id', 0); // Deletes all rows where id is not 0 (i.e., all rows)
+
+                    if (error) {
+                        throw error;
+                    }
+                    closePasswordModal();
+                } catch (e) {
+                    console.error("Error clearing log: ", e);
+                    passwordError.textContent = "Error clearing log. See console.";
+                    passwordError.style.display = 'block';
+                }
+            } else {
+                passwordError.textContent = "Incorrect password. Please try again.";
+                passwordError.style.display = 'block';
+            }
+        }
+
+        function loadLogData(button) {
+            const data = button.dataset;
+            
+            const pensionerNameInput = document.getElementById('pensioner-name');
+            const dobInput = document.getElementById('dob');
+            const dojInput = document.getElementById('doj'); 
+            const sosInput = document.getElementById('sos');
+            const bpsInput = document.getElementById('bps'); // Added: BPS Input
+            const grossPensionInput = document.getElementById('gross-pension-ppo');
+            const familyPensionInput = document.getElementById('family-pension');
+            
+            pensionerNameInput.value = data.name || ''; // Load Name
+            dobInput.value = data.dob || '';
+            dojInput.value = data.doj || ''; 
+            sosInput.value = data.sos || '';
+            bpsInput.value = data.bps || ''; // Added: BPS Value
+            
+            const pensionValue = data.pension || '';
+            grossPensionInput.value = pensionValue;
+            
+            const parts = pensionValue.split('.');
+            let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+            
+            grossPensionInput.value = integerPart;
+                if (decimalPart) {
+                grossPensionInput.value += '.' + decimalPart;
+            }
+            if (parseFloat(pensionValue) === 0) {
+                grossPensionInput.value = '0';
+            }
+
+            familyPensionInput.value = data.family || 'No';
+
+            // Assume manual link is needed if loading from log (since pay component data isn't saved)
+            const linkCheckbox = document.getElementById('link-gross-pension');
+            linkCheckbox.checked = false; 
+
+            // Clear pay components since we don't save them in the log
+            const payInputs = document.querySelectorAll('.pay-input');
+            payInputs.forEach(input => input.value = '');
+            document.getElementById('total-pay').value = '';
+
+            checkInputEnabling();
+            calculateAndDisplayAll();
+            
+            if (isSupabaseEnabled) {
+                clearTimeout(logDebounceTimer);
+                if (dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) { 
+                    logDebounceTimer = setTimeout(() => {
+                        logCalculation('Load Log Data (Debounced)');
+                    }, LOG_DEBOUNCE_DELAY);
+                }
+            }
+        }
+
+        // The stepper button functions are intentionally left as stubs
+        function startPress(amount) { /* Functionality disabled */ }
+        function stopPress() { /* Functionality disabled */ }
+        function adjustPension(amount) { /* Functionality disabled */ }
+
+        function formatGrossPensionInput(event) {
+            // This is now the universal pay input handler
+            let input = event.target.value.replace(/[^0-9.]/g, '');
+            const parts = input.split('.');
+
+            if (parts.length > 2) {
+                input = parts[0] + '.' + parts.slice(1).join('');
+            }
+            if (parts.length === 2) {
+                parts[1] = parts[1].substring(0, 2);
+                input = parts.join('.');
+            }
+            
+            let integerPart = parts[0].replace(/,/g, '');
+            integerPart = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            
+            event.target.value = parts.length > 1 ? integerPart + '.' + parts[1] : integerPart;
+            
+            // Re-calculate total pay and run full calculation
+            calculateTotalPay();
+            calculateAndDisplayAll();
+            
+            if (isSupabaseEnabled) {
+                clearTimeout(logDebounceTimer);
+                const dobInput = document.getElementById('dob');
+                const dojInput = document.getElementById('doj'); 
+                const sosInput = document.getElementById('sos');
+                const grossPensionInput = document.getElementById('gross-pension-ppo');
+                if (dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) { 
+                    logDebounceTimer = setTimeout(() => {
+                        logCalculation('Input Change (Debounced)');
+                    }, LOG_DEBOUNCE_DELAY);
+                }
+            }
+
+            checkInputEnabling();
+        }
+
+        // NEW: Function to calculate total pay from components and update the Gross Pension field
+        function calculateTotalPay() {
+            const linkCheckbox = document.getElementById('link-gross-pension');
+            const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
+            
+            const basicPay = parseFloat(document.getElementById('basic-pay').value.replace(/,/g, '')) || 0;
+            const personnelPay = parseFloat(document.getElementById('personnel-pay').value.replace(/,/g, '')) || 0;
+            const qualificationPay = parseFloat(document.getElementById('qualification-pay').value.replace(/,/g, '')) || 0;
+            const otherPay = parseFloat(document.getElementById('other-pay').value.replace(/,/g, '')) || 0;
+
+            const totalPay = basicPay + personnelPay + qualificationPay + otherPay;
+            
+            const totalPayInput = document.getElementById('total-pay');
+            
+            // Format and update Total Pay field
+            totalPayInput.value = formatCurrency(totalPay, false).replace('Rs. ', '');
+            
+            if (linkCheckbox && linkCheckbox.checked) {
+                
+                // --- START NEW FORMULA IMPLEMENTATION ---
+                const dojInput = document.getElementById('doj'); 
+                const sosInput = document.getElementById('sos');
+
+                // 1. Calculate Capped Qualifying Service (B13 logic)
+                let cappedQS = 0;
+                const dojDate = parseDate(dojInput.value); 
+                const sosDate = parseDate(sosInput.value);
+
+                if (dojDate && sosDate) {
+                    const serviceInMillis = sosDate - dojDate; 
+                    const serviceInYearsDecimal = serviceInMillis / (1000 * 60 * 60 * 24 * 365.25);
+                    cappedQS = Math.round(serviceInYearsDecimal);
+
+                    // Cap at 30 years
+                    if (cappedQS > 30) {
+                        cappedQS = 30;
+                    }
+                }
+                
+                let calculatedGrossPension = 0;
+                if (totalPay > 0 && cappedQS > 0) {
+                    // Formula: ROUND((Total Pay * 7 / 300 * Capped QS), 2)
+                    // Note: 7/300 is the formula factor
+                    calculatedGrossPension = roundToTwoDecimals((totalPay * 7 / 300) * cappedQS);
+                }
+                
+                // Update the Gross Pension PPO input with the calculated gross pension
+                grossPensionPPOInput.value = formatCurrency(calculatedGrossPension, false).replace('Rs. ', '');
+                
+                return calculatedGrossPension;
+                // --- END NEW FORMULA IMPLEMENTATION ---
+            }
+            
+            // If the box is unchecked, return the manually entered value
+            return parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) || 0;
+        }
+
+
+        function populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension) {
+            const tbody = document.getElementById('increase-table-body');
+            tbody.innerHTML = '';
+            
+            const date1977_04_30 = parseDate('1977-04-30');
+            const date1977_05_01 = parseDate('1977-05-01');
+            const date1947_08_14 = parseDate('1947-08-14');
+            const date1991_06_01 = parseDate('1991-06-01');
+            const date1993_06_01 = parseDate('1993-06-01');
+            const date1993_06_30 = parseDate('1993-06-30');
+            const date2001_12_01 = parseDate('2001-12-01');
+            const date1991_05_31 = parseDate('1991-05-31');
+            const date1993_07_01 = parseDate('1993-07-01');
+            const date1994_06_30 = parseDate('1994-06-30');
+            const date1994_07_01 = parseDate('1994-07-01');
+            const date1977_04_30_2006 = parseDate('1977-04-30');
+            const date1977_05_01_2006 = parseDate('1977-05-01');
+            const date1997_06_30_2007 = parseDate('1997-06-30');
+            const date2007_07_01_2007 = parseDate('2007-07-01');
+            const date1997_07_01_2007 = parseDate('1997-07-01');
+            const date2001_06_30_2009 = parseDate('2001-6-30');
+            const date2001_07_01_2009 = parseDate('2001-7-01');
+            const date2001_11_30_2010 = parseDate('2001-11-30');
+            const date2001_07_01_2010 = parseDate('2001-07-01');
+            const date2002_06_30_2011 = parseDate('2002-06-30');
+            
+            let previousNetValueCurrent = basePension; 
+            let previousNetValueRestored = grossPension; 
+            const currentNetValues = [];
+            const restoredNetValues = [];
+            let net2024_Current = 0;
+            let net2024_Restored = 0;
+
+            const netByYearCurrent = {}; // New object to capture net values by year for Medical Allowance formula
+            const netByYearRestored = {};
+
+            pensionIncreases.forEach(item => {
+                const row = tbody.insertRow(); 
+                const fromDate = parseDate(item.from);
+                const toDate = parseDate(item.to);
+                
+                let isEntitled = 'N';
+                let percentageToDisplay = item.percentage;
+                const year = item.year;
+                
+                if (sosDate) {
+                    if (year === 1991) {
+                        if (sosDate > date1977_04_30) percentageToDisplay = '12%';
+                        else if (sosDate < date1977_05_01) percentageToDisplay = '32%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 1995) {
+                        if (sosDate > date1947_08_14 && sosDate < date1977_04_30) percentageToDisplay = '15%';
+                        else if (sosDate > date1977_04_30 && sosDate < date1991_06_01) percentageToDisplay = '10%';
+                        else if (sosDate < date1993_06_01) percentageToDisplay = '5%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2001) {
+                        if (sosDate > date1993_06_30 && sosDate < date2001_12_01) percentageToDisplay = '5%';
+                        else if (sosDate > date1991_05_31 && sosDate < date1993_07_01) percentageToDisplay = '10%';
+                        else if (sosDate < date1991_06_01) percentageToDisplay = '15%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2004) {
+                        if (sosDate > date1994_06_30) percentageToDisplay = '8%';
+                        else if (sosDate < date1994_07_01) percentageToDisplay = '16%'; // Corrected from date1T994_07_01
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2006) {
+                        if (sosDate > date1977_04_30_2006) percentageToDisplay = '15%';
+                        else if (sosDate < date1977_05_01_2006) percentageToDisplay = '20%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2007) {
+                        if (sosDate > date1997_06_30_2007 && sosDate < date2007_07_01_2007) percentageToDisplay = '15%';
+                        else if (sosDate < date1997_07_01_2007) percentageToDisplay = '20%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2009) {
+                        if (sosDate > date2001_06_30_2009) percentageToDisplay = '15%';
+                        else if (sosDate < date2001_07_01_2009) percentageToDisplay = '20%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2010) {
+                        if (sosDate > date2001_11_30_2010) percentageToDisplay = '15%';
+                        else if (sosDate < date2001_07_01_2010) percentageToDisplay = '20%';
+                        else percentageToDisplay = '0%';
+                    } else if (year === 2011) {
+                        if (sosDate > date2002_06_30_2011) percentageToDisplay = '15%';
+                        else if (sosDate < date2002_06_30_2011) percentageToDisplay = '20%';
+                        else percentageToDisplay = '0%';
+                    }
+                } else if (item.percentage === 'CONDITIONAL') {
+                    percentageToDisplay = '-';
+                }
+
+                if (sosDate && fromDate && toDate) {
+                    const condition1 = (sosDate >= fromDate && sosDate <= toDate);
+                    const condition2 = (fromDate >= sosDate); 
+                    if (condition1 || condition2) isEntitled = 'Y';
+                }
+
+                if (isEntitled === 'N') {
+                    row.classList.add('hidden');
+                }
+                
+                let currentBaseLine = previousNetValueCurrent; 
+                let currentIncreaseValue = 0;
+                let currentNetValue = currentBaseLine; 
+                let baseLineDisplayCurrent = '-';
+                let restoredBaseLine = previousNetValueRestored;
+                let restoredIncreaseValue = 0;
+                let restoredNetValue = restoredBaseLine;
+                let baseLineDisplayRestored = '-';
+
+                const percentageText = percentageToDisplay.replace('%', '');
+                const percentageValue = parseFloat(percentageText) / 100;
+                
+                let isIncreaseCalculatedCurrent = false;
+                let isNetCalculatedCurrent = false; 
+                let isIncreaseCalculatedRestored = false;
+                let isNetCalculatedRestored = false; 
+
+                const minPensionSelf = minPensionData[year] ? minPensionData[year].self : 0;
+                const minPensionFamily = minPensionData[year] ? minPensionData[year].family : 0;
+                const applicableMinPension = isFamilyPension ? minPensionFamily : minPensionSelf;
+                let minPensionAppliedCurrent = false;
+                let minPensionAppliedRestored = false;
+
+                if (year === 1987) { 
+                    restoredBaseLine = grossPension;
+                    if (isEntitled === 'Y' && !isNaN(percentageValue) && grossPension > 0) {
+                        restoredIncreaseValue = roundToTwoDecimals(percentageValue * grossPension);
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+
+                    currentIncreaseValue = restoredIncreaseValue;
+                    isIncreaseCalculatedCurrent = isIncreaseCalculatedRestored;
+                    if (currentIncreaseValue > 0) {
+                        currentNetValue = roundToTwoDecimals(currentIncreaseValue + grossPension - basePension);
+                    } else {
+                        currentNetValue = roundToTwoDecimals(basePension);
+                    }
+                    isNetCalculatedCurrent = true;
+                } else if (year === 1988) {
+                    restoredBaseLine = previousNetValueRestored; 
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        const baseForIncrease = Math.max(restoredBaseLine, applicableMinPension);
+                        restoredIncreaseValue = roundToTwoDecimals(baseForIncrease * percentageValue); 
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+
+                    currentIncreaseValue = restoredIncreaseValue;
+                    isIncreaseCalculatedCurrent = isIncreaseCalculatedRestored;
+                    currentNetValue = roundToTwoDecimals(previousNetValueCurrent + currentIncreaseValue);
+                    isNetCalculatedCurrent = true;
+                } else if (year === 1990) {
+                    restoredBaseLine = previousNetValueRestored; 
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        const baseForIncrease = Math.max(restoredBaseLine, applicableMinPension);
+                        restoredIncreaseValue = roundToTwoDecimals(baseForIncrease * percentageValue); 
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+                    
+                    currentIncreaseValue = restoredIncreaseValue;
+                    isIncreaseCalculatedCurrent = isIncreaseCalculatedRestored;
+                    if (currentIncreaseValue > 0) {
+                        currentNetValue = roundToTwoDecimals(currentIncreaseValue + grossPension - basePension);
+                    } else {
+                        currentNetValue = roundToTwoDecimals(basePension);
+                    }
+                    isNetCalculatedCurrent = true;
+                } else if (year >= 1991 && year <= 1999) {
+                    restoredBaseLine = previousNetValueRestored;
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        const baseForIncrease = Math.max(restoredBaseLine, applicableMinPension);
+                        restoredIncreaseValue = roundToTwoDecimals(baseForIncrease * percentageValue); 
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+
+                    currentIncreaseValue = restoredIncreaseValue;
+                    isIncreaseCalculatedCurrent = isIncreaseCalculatedRestored;
+                    currentNetValue = roundToTwoDecimals(previousNetValueCurrent + currentIncreaseValue);
+                    isNetCalculatedCurrent = true;
+                } else if (year >= 2001 && year <= 2024) {
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        currentIncreaseValue = roundToTwoDecimals(percentageValue * previousNetValueCurrent);
+                        isIncreaseCalculatedCurrent = true;
+                    } else {
+                        currentIncreaseValue = 0;
+                    }
+                    currentNetValue = roundToTwoDecimals(previousNetValueCurrent + currentIncreaseValue);
+                    isNetCalculatedCurrent = true;
+
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        restoredIncreaseValue = roundToTwoDecimals(restoredBaseLine * percentageValue);
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+                } else if (year === 2025) {
+                    currentBaseLine = net2024_Current; 
+                    baseLineDisplayCurrent = formatCurrency(currentBaseLine, false, true);
+                    if (isEntitled === 'Y' && percentageValue > 0) {
+                            currentIncreaseValue = roundToTwoDecimals(percentageValue * currentBaseLine); 
+                        isIncreaseCalculatedCurrent = true;
+                    } else {
+                        currentIncreaseValue = 0;
+                    }
+                    currentNetValue = roundToTwoDecimals(currentIncreaseValue + net2024_Current);
+                    isNetCalculatedCurrent = true;
+                    
+                    restoredBaseLine = net2024_Restored; 
+                    baseLineDisplayRestored = formatCurrency(restoredBaseLine, false, true);
+                    if (isEntitled === 'Y' && !isNaN(percentageValue)) {
+                        restoredIncreaseValue = roundToTwoDecimals(restoredBaseLine * percentageValue);
+                        isIncreaseCalculatedRestored = true;
+                    } else {
+                        restoredIncreaseValue = 0;
+                    }
+                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    isNetCalculatedRestored = true;
+                }
+
+                if (year > 1999) {
+                    if (isEntitled === 'Y' && isNetCalculatedCurrent && applicableMinPension > 0 && currentNetValue < applicableMinPension) {
+                        currentNetValue = applicableMinPension;
+                        minPensionAppliedCurrent = true;
+                    }
+                    if (isEntitled === 'Y' && isNetCalculatedRestored && applicableMinPension > 0 && restoredNetValue < applicableMinPension) {
+                        restoredNetValue = applicableMinPension;
+                        minPensionAppliedRestored = true;
+                    }
+                }
+                
+                if (isNetCalculatedCurrent) {
+                    previousNetValueCurrent = currentNetValue;
+                    currentNetValues.push(currentNetValue);
+                    netByYearCurrent[item.year] = currentNetValue; // Capture net value by year
+                }
+                if (isNetCalculatedRestored) {
+                    previousNetValueRestored = restoredNetValue;
+                    restoredNetValues.push(restoredNetValue);
+                    netByYearRestored[item.year] = restoredNetValue; // Capture net value by year
+                }
+
+                if (year === 2024) {
+                    net2024_Current = currentNetValue;
+                    net2024_Restored = restoredNetValue;
+                }
+                
+                // Table row population remains the same...
+                row.insertCell().textContent = year;
+                row.insertCell().textContent = percentageToDisplay;
+                // MODIFIED: Base Line is only shown from 2025 onwards
+                row.insertCell().textContent = year >= 2025 ? baseLineDisplayCurrent : '-'; 
+                row.insertCell().textContent = isIncreaseCalculatedCurrent ? formatCurrency(currentIncreaseValue, false, true) : '-';
+                const netCellCurrent = row.insertCell();
+                netCellCurrent.textContent = isNetCalculatedCurrent ? formatCurrency(currentNetValue, false, true) : '-';
+                if (minPensionAppliedCurrent) netCellCurrent.classList.add('text-blue-600', 'font-bold');
+                // MODIFIED: Base Line is only shown from 2025 onwards
+                row.insertCell().textContent = year >= 2025 ? baseLineDisplayRestored : '-';
+                row.insertCell().textContent = isIncreaseCalculatedRestored ? formatCurrency(restoredIncreaseValue, false, true) : '-';
+                const netCellRestored = row.insertCell();
+                netCellRestored.textContent = isNetCalculatedRestored ? formatCurrency(restoredNetValue, false, true) : '-';
+                if (minPensionAppliedRestored) netCellRestored.classList.add('text-blue-600', 'font-bold');
+                
+                row.insertCell().textContent = isEntitled;
+                row.cells[8].classList.add('hidden-column');
+                row.insertCell().textContent = formatDateTable(item.from);
+                row.cells[9].classList.add('hidden-column');
+                row.insertCell().textContent = formatDateTable(item.to);
+                row.cells[10].classList.add('hidden-column');
+                row.insertCell().textContent = minPensionSelf > 0 ? formatCurrency(minPensionSelf, false, true) : '-';
+                row.cells[11].classList.add('hidden-column');
+                row.insertCell().textContent = minPensionFamily > 0 ? formatCurrency(minPensionFamily, false, true) : '-';
+                row.cells[12].classList.add('hidden-column');
+            });
+            
+            return { current: currentNetValues, restored: restoredNetValues, netByYearCurrent, netByYearRestored };
+        }
+
+        // NEW: Helper function to reset all output fields when calculation is skipped
+        function resetOutputFields() {
+            // Service Summary
+            document.getElementById('qs-output').textContent = '0 Years';
+            document.getElementById('age-at-sos-output').textContent = '0 Years';
+            document.getElementById('commutation-factor-output').textContent = '0';
+            
+            // Pension Details
+            document.getElementById('gross-pension-output').textContent = '-';
+            document.getElementById('net-pension-pre-increase-output').textContent = '-';
+            document.getElementById('commuted-pension-output').textContent = '-';
+            document.getElementById('commutation-amount-output').textContent = '-';
+            
+            // Final Pension
+            document.getElementById('pension-pm-current-output').textContent = '0';
+            document.getElementById('pension-pm-restored-output').textContent = '0';
+            document.getElementById('medical-allowance-output').textContent = '0';
+            document.getElementById('total-payable-current-output').textContent = '0';
+            document.getElementById('total-payable-restored-output').textContent = '0';
+            
+            // Restoration Date/Age
+            const restorationOutputSpan = document.getElementById('restoration-date-output');
+            restorationOutputSpan.textContent = 'N/A';
+            restorationOutputSpan.className = 'value text-gray-800'; 
+            document.getElementById('age-at-restoration-output').textContent = '0 Years';
+
+            // Clear increase table
+            document.getElementById('increase-table-body').innerHTML = '';
+        }
+
+        function calculateAndDisplayAll() {
+            // Get the Gross Pension PPO value based on the link toggle state
+            const grossPensionPPO = calculateTotalPay(); 
+            
+            // GUARD CLAUSE: If Gross Pension is zero or less, reset outputs and stop.
+            if (grossPensionPPO <= 0) {
+                resetOutputFields();
+                
+                // Clear any pending log debounce timer when calculation is invalid/zero
+                if (logDebounceTimer) {
+                    clearTimeout(logDebounceTimer);
+                    logDebounceTimer = null;
+                }
+                return;
+            }
+            
+            try {
+                const dobInput = document.getElementById('dob');
+                const dojInput = document.getElementById('doj'); 
+                const sosInput = document.getElementById('sos'); 
+                const bpsInput = document.getElementById('bps'); // Added: BPS Input
+                const familyPensionInput = document.getElementById('family-pension');
+                
+                const dobDate = parseDate(dobInput.value);
+                const dojDate = parseDate(dojInput.value); 
+                const sosDate = parseDate(sosInput.value);
+                const bpsValue = parseInt(bpsInput.value); // Parse BPS value as integer
+                const isFamilyPension = familyPensionInput.value === 'Yes';
+                
+                document.getElementById('dob-display').textContent = formatDateDisplay(dobDate);
+                document.getElementById('doj-display').textContent = formatDateDisplay(dojDate); 
+                document.getElementById('sos-display').textContent = formatDateDisplay(sosDate);
+
+                let roundedQS = 0;
+                let ageNextBirthday = 0;
+                let commutationFactor = 0;
+                let restorationDate = null;
+                
+                if (dojDate && sosDate) { 
+                    const serviceInMillis = sosDate - dojDate; 
+                    const serviceInYearsDecimal = serviceInMillis / (1000 * 60 * 60 * 24 * 365.25);
+                    roundedQS = Math.round(serviceInYearsDecimal);
+
+                    // Apply 30-year cap for QS calculation
+                    if (roundedQS > 30) {
+                        roundedQS = 30;
+                    }
+
+                    if (dobDate) {
+                        const sosPlusOneDay = new Date(sosDate);
+                        sosPlusOneDay.setUTCDate(sosPlusOneDay.getUTCDate() + 1);
+                        const ageAtSOSInYears = (sosPlusOneDay - dobDate) / (1000 * 60 * 60 * 24 * 365.25);
+                        ageNextBirthday = Math.ceil(ageAtSOSInYears);
+                    }
+
+                    let factorsToUse = null;
+                    const policyDate2001 = parseDate('2001-12-01');
+                    const policyDate1986 = parseDate('1986-07-01');
+                    if (sosDate >= policyDate2001) factorsToUse = factors_2001_12_01;
+                    else if (sosDate >= policyDate1986) factorsToUse = factors_1986_07_01;
+                    else factorsToUse = factors_1966_07_01;
+                    commutationFactor = factorsToUse[ageNextBirthday] || 0;
+
+                    const roundedCommutationFactor = Math.round(commutationFactor);
+                    
+                    // NEW RESTORATION DATE LOGIC: SOS + 1 day + Commutation Years
+                    const restorationBaseDate = new Date(sosDate);
+                    restorationBaseDate.setUTCDate(restorationBaseDate.getUTCDate() + 1);
+                    restorationDate = restorationBaseDate;
+                    restorationDate.setUTCFullYear(restorationDate.getUTCFullYear() + roundedCommutationFactor);
+                }
+                
+                let grossPension = grossPensionPPO;
+                if (isFamilyPension) {
+                    // This is the main gross pension figure used for subsequent calculations (commutation, increases table)
+                    grossPension = roundToTwoDecimals(grossPensionPPO * 0.75);
+                }
+
+                let commutedPensionPercentage = 0;
+                if (sosDate) {
+                    const date2005 = parseDate('2005-06-30');
+                    const date2001 = parseDate('2001-11-30');
+                    if (sosDate > date2005) commutedPensionPercentage = 0.35;
+                    else if (sosDate > date2001) commutedPensionPercentage = 0.40;
+                    else commutedPensionPercentage = 0.50;
+                }
+                
+                // basePension (Net Pension Before Increases) uses the family-adjusted grossPension:
+                const commutedPension = roundToTwoDecimals(grossPension * commutedPensionPercentage);
+                const basePension = roundToTwoDecimals(grossPension - commutedPension);
+
+                // ----------------------------------------------------
+                // LOGIC for Medical Allowance Base (Unadjusted for Family Pension - B17 equivalent)
+                // This value is used if SOS >= 2015-07-01.
+                // ----------------------------------------------------
+                let medicalAllowanceBase_unadjusted = 0;
+                if (grossPensionPPO > 0) {
+                    // 1. Commuted Pension using UNADJUSTED grossPensionPPO
+                    const medicalCommutedPension = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage);
+                    // 2. Medical Allowance Base = Gross Pension PPO - Commuted Pension (from PPO)
+                    medicalAllowanceBase_unadjusted = roundToTwoDecimals(grossPensionPPO - medicalCommutedPension);
+                }
+                
+                const commutationAmount = roundToTwoDecimals(grossPensionPPO * commutedPensionPercentage * commutationFactor * 12);
+
+                const netValues = populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension);
+                
+                let finalPensionCurrent = basePension;
+                if (netValues.current.length > 0) {
+                    finalPensionCurrent = Math.max(basePension, ...netValues.current);
+                }
+                finalPensionCurrent = Math.ceil(finalPensionCurrent);
+
+                let finalPensionRestored = grossPension; 
+                if (netValues.restored.length > 0) {
+                    finalPensionRestored = Math.max(grossPension, ...netValues.restored);
+                }
+                finalPensionRestored = Math.ceil(finalPensionRestored);
+                
+                // ----------------------------------------------------
+                // Medical Allowance Final Calculation (Implementing IF($B$10>DATE(2015,6,30), B17, R17))
+                // ----------------------------------------------------
+                let medicalAllowance = 0;
+                
+                if (grossPensionPPO > 0 && sosDate) {
+                    const policyDate2015 = parseDate('2015-07-01');
+                    
+                    let baseForBPSCalculation = 0; 
+
+                    // R17 (Net Pension after 2010 Increase) - This value is pulled from the increases table.
+                    // NOTE: This value IS FAMILY-ADJUSTED, as per previous logic.
+                    // If Family Pension is selected, R17 reflects the family-adjusted 2010 net pension.
+                    const R17 = netValues.netByYearCurrent[2010] || medicalAllowanceBase_unadjusted;
+
+                    if (sosDate >= policyDate2015) {
+                        // IF TRUE: Use B17 (Unadjusted Net Pension Before Increases)
+                        baseForBPSCalculation = medicalAllowanceBase_unadjusted; 
+                    } else {
+                        // IF FALSE: Use R17 (Net Pension after 2010 Increase - Family Adjusted)
+                        baseForBPSCalculation = R17;
+                    }
+                    
+                    let reductionFactor = 0;
+
+                    if (!isNaN(bpsValue) && bpsValue >= 1 && bpsValue <= 22) {
+                        if (bpsValue <= 15) {
+                            reductionFactor = 0.25; // 25%
+                        } else { // 16 to 22
+                            reductionFactor = 0.20; // 20%
+                        }
+                        
+                        // Step 1: Apply BPS reduction to the selected base
+                        let calculatedAmount = baseForBPSCalculation * reductionFactor;
+                        
+                        // Step 2: Apply the additional 25% increase
+                        medicalAllowance = calculatedAmount * 1.25;
+                    } else {
+                        medicalAllowance = 0;
+                    }
+                    
+                    // Step 3: Apply Ceiling
+                    medicalAllowance = Math.ceil(medicalAllowance);
+                }
+                // ----------------------------------------------------
+
+                // NEW: Total Payable Calculations (Rounded to whole number, same as Pension)
+                const totalPayableCurrent = Math.ceil(finalPensionCurrent + medicalAllowance);
+                const totalPayableRestored = Math.ceil(finalPensionRestored + medicalAllowance);
+
+                document.getElementById('qs-output').textContent = `${roundedQS} Years`;
+                document.getElementById('age-at-sos-output').textContent = `${ageNextBirthday} Years`;
+                document.getElementById('commutation-factor-output').textContent = commutationFactor.toFixed(4);
+                document.getElementById('gross-pension-output').textContent = formatCurrency(grossPension);
+                document.getElementById('net-pension-pre-increase-output').textContent = formatCurrency(basePension);
+                document.getElementById('commuted-pension-output').textContent = formatCurrency(commutedPension);
+                document.getElementById('commutation-amount-output').textContent = formatCurrency(commutationAmount);
+                document.getElementById('pension-pm-current-output').textContent = formatCurrency(finalPensionCurrent, true);
+                document.getElementById('pension-pm-restored-output').textContent = formatCurrency(finalPensionRestored, true);
+                document.getElementById('medical-allowance-output').textContent = formatCurrency(medicalAllowance, true); // Updated to use new value
+
+                // NEW: Display Total Payable Fields
+                document.getElementById('total-payable-current-output').textContent = formatCurrency(totalPayableCurrent, true);
+                document.getElementById('total-payable-restored-output').textContent = formatCurrency(totalPayableRestored, true);
+                
+                const restorationOutputSpan = document.getElementById('restoration-date-output');
+                const restorationDateFormatted = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
+                restorationOutputSpan.textContent = restorationDateFormatted;
+                
+                if (restorationDate) {
+                    const today = parseDate(getTodayDateString());
+                    restorationOutputSpan.className = 'value'; 
+                    if (restorationDate > today) {
+                        restorationOutputSpan.classList.add('text-red-600', 'font-bold');
+                    } else {
+                        restorationOutputSpan.classList.add('text-green-600', 'font-bold', 'flashing');
+                    }
+                } else {
+                        restorationOutputSpan.className = 'value text-gray-800'; 
+                }
+                
+                let restorationAgeDisplay = 'N/A';
+                if (dobDate && restorationDate && restorationDate > dobDate) {
+                    let totalMonths = (restorationDate.getUTCFullYear() - dobDate.getUTCFullYear()) * 12;
+                    totalMonths -= dobDate.getUTCMonth();
+                    totalMonths += restorationDate.getUTCMonth();
+                    if (restorationDate.getUTCDate() < dobDate.getUTCDate()) {
+                        totalMonths--;
+                    }
+                    const restorationAgeYears = Math.floor(totalMonths / 12);
+                    const restorationAgeMonths = totalMonths % 12;
+                    let yearsString = `${restorationAgeYears} Years`;
+                    let monthsString = (restorationAgeMonths === 1) ? `, 1 Month` : (restorationAgeMonths > 1) ? `, ${restorationAgeMonths} Months` : '';
+                    restorationAgeDisplay = yearsString + monthsString;
+                }
+                document.getElementById('age-at-restoration-output').textContent = restorationAgeDisplay;
+
+                // RE-ADDED: Store raw calculated values for logging
+                currentCalculatedValues.pensionCurrent = totalPayableCurrent; // Store total payable
+                currentCalculatedValues.pensionRestored = totalPayableRestored; // Store total payable restored
+                currentCalculatedValues.restorationDate = restorationDateFormatted;
+                currentCalculatedValues.medicalAllowance = medicalAllowance; 
+                
+                // Trigger log if a valid calculation occurred (handled by checkInputEnabling)
+            } catch (error) {
+                console.error("Error in calculateAndDisplayAll:", error);
+            }
+        }
+        
+        function checkInputEnabling() {
+            const dobInput = document.getElementById('dob');
+            const dojInput = document.getElementById('doj'); 
+            const sosInput = document.getElementById('sos');
+            const bpsInput = document.getElementById('bps'); // Added: BPS Input
+            const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
+            const familyPensionInput = document.getElementById('family-pension');
+            const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
+            const payComponentsCard = document.getElementById('pay-components-card'); // New Pay Card
+            const payInputs = document.querySelectorAll('.pay-input');
+
+            const dobFilled = dobInput.value !== '';
+            const dojFilled = dojInput.value !== ''; 
+            const sosFilled = sosInput.value !== '';
+            const bpsFilled = bpsInput.value !== ''; 
+            const dateFieldsFilled = dobFilled && dojFilled && sosFilled;
+            
+            // Check link state and base enablement
+            const linkEnabled = linkCheckbox.checked;
+            const coreInputsEnabled = dateFieldsFilled && bpsFilled;
+            
+            // Gross Pension is read-only if linked, editable if unlinked.
+            const grossPensionEnabled = coreInputsEnabled; // Must be enabled if core fields are filled
+            grossPensionPPOInput.readOnly = linkEnabled;
+            grossPensionPPOInput.classList.toggle('manual-input', !linkEnabled);
+            grossPensionPPOInput.disabled = !coreInputsEnabled;
+            
+            // Pay component inputs are only enabled if core inputs are filled AND the link is active.
+            const payInputsEnabled = coreInputsEnabled && linkEnabled;
+            payInputs.forEach(input => {
+                input.disabled = !payInputsEnabled;
+            });
+            
+            // Toggle visibility/status of the Pay Components Card
+            if (payComponentsCard) {
+                payComponentsCard.style.display = linkEnabled ? 'block' : 'none';
+            }
+
+            // Check if Gross Pension field has a valid calculated/manual value > 0
+            const grossPensionValue = parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) || 0;
+            const grossPensionFilled = grossPensionValue > 0;
+
+            familyPensionInput.disabled = !(coreInputsEnabled && grossPensionFilled); 
+            
+            // Recalculate if anything changed state (necessary for linked fields)
+            if (linkCheckbox.checked) {
+                calculateTotalPay();
+            }
+            
+            calculateAndDisplayAll();
+        }
+        
+        // --- Supabase Log Count Fetcher ---
+        async function fetchLogCount() {
+            if (!isSupabaseEnabled) return; 
+            
+            const logCountSpan = document.getElementById('log-count');
+            if (!logCountSpan) return;
+
+            try {
+                // Fetch the count using Supabase's count method
+                const { count, error } = await supabaseClient
+                    .from('logs')
+                    .select('*', { count: 'exact', head: true }); 
+
+                if (error) throw error;
+
+                logCountSpan.textContent = formatVisitCount(count); 
+
+            } catch (e) {
+                console.error("Failed to fetch log count:", e);
+                logCountSpan.textContent = 'Error';
+            }
+        }
+        
+        // --- Supabase Visit Counter ---
+        async function initVisitCounter() {
+            if (!isSupabaseEnabled) {
+                document.getElementById('log-counters-wrapper').style.display = 'none';
+                return; 
+            }
+            
+            const visitCountSpan = document.getElementById('visit-count');
+            if (!visitCountSpan) return;
+
+            // Initialize log count immediately
+            fetchLogCount(); 
+
+            try {
+                // 1. Increment the count by calling the 'increment_visits' RPC function
+                const { data: rpcData, error: rpcError } = await supabaseClient.rpc('increment_visits');
+                if (rpcError) throw rpcError;
+                
+                // 2. Set the count from the RPC's return value
+                if (rpcData) {
+                    visitCountSpan.textContent = formatVisitCount(rpcData); // Use formatter
+                }
+
+                // 3. Listen for REALTIME updates from other users
+                supabaseClient.channel('visits-channel')
+                    .on(
+                        'postgres_changes',
+                        { event: 'UPDATE', schema: 'public', table: 'visits', filter: 'id=eq.1' },
+                        (payload) => {
+                            // When an update happens, set the new count
+                            visitCountSpan.textContent = formatVisitCount(payload.new.count); // Use formatter
+                        }
+                    )
+                    .subscribe();
+
+            } catch (e) {
+                console.error("Failed to update visit count (online features disabled):", e);
+                // If increment fails, just try to fetch the current count
+                try {
+                    const { data, error } = await supabaseClient.from('visits').select('count').eq('id', 1).single();
+                    if (error) throw error;
+                    visitCountSpan.textContent = formatVisitCount(data.count); // Use formatter
+                } catch (fetchError) {
+                     console.error("Failed to fetch visit count (online features disabled):", fetchError);
+                     document.getElementById('log-counters-wrapper').style.display = 'none';
+                }
+            }
+        }
+
+        // --- Supabase Log Listener ---
+        
+        // This helper function fetches all logs and renders them
+        async function fetchLogs() {
+            if (!isSupabaseEnabled) return; 
+
+            try {
+                const { data, error } = await supabaseClient
+                    .from('logs')
+                    .select('*')
+                    .order('created_at', { ascending: false }) // Get newest first
+                    .limit(50); // Get latest 50 logs
+                
+                if (error) throw error;
+                
+                renderLog(data || []);
+            } catch (error) {
+                console.error("Error fetching logs (online features disabled): ", error);
+                const logContainer = document.getElementById('log-container');
+                if(logContainer) logContainer.innerHTML = '<span class="text-red-500">Error loading log. Online features disabled.</span>';
+            }
+        }
+
+        function initLogListener() {
+            if (!isSupabaseEnabled) {
+                document.getElementById('log-wrapper').style.display = 'none';
+                return;
+            }
+
+            // 1. Fetch initial logs on load
+            fetchLogs();
+
+            // 2. Listen for REALTIME inserts/deletes to refresh the list AND the count
+            supabaseClient.channel('logs-channel')
+                .on(
+                    'postgres_changes',
+                    { event: 'INSERT', schema: 'public', table: 'logs' },
+                    (payload) => {
+                        // A new log was added, re-fetch the list and count
+                        fetchLogs();
+                        fetchLogCount();
+                    }
+                )
+                .on(
+                    'postgres_changes',
+                    { event: 'DELETE', schema: 'public', table: 'logs' },
+                    (payload) => {
+                        // Logs were deleted (cleared), re-fetch the (now empty) list and count
+                        fetchLogs();
+                        fetchLogCount();
+                    }
+                )
+                .subscribe();
+        }
+
+        // --- App Entry Point (DOM Ready) ---
+        document.addEventListener('DOMContentLoaded', async () => {
+            const appWarning = document.getElementById('app-warning');
+            
+            function showWarning(message) {
+                if (appWarning) {
+                    appWarning.textContent = message;
+                    appWarning.style.display = 'block';
+                }
+                console.warn(message);
+            }
+
+            // --- 1. Try to initialize Supabase ---
+            // Updated check for empty credentials
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+                showWarning("Supabase URL or Key is missing. Online features (logging/visits) are disabled.");
+                isSupabaseEnabled = false;
+                // Hide online features
+                document.getElementById('log-counters-wrapper').style.display = 'none';
+                document.getElementById('log-wrapper').style.display = 'none';
+            } else {
+                // Config is present, try to connect
+                try {
+                    // Initialize the client
+                    supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                    
+                    if (!supabaseClient) {
+                        throw new Error("Supabase client failed to initialize.");
+                    }
+                    
+                    isSupabaseEnabled = true; 
+                    console.log("Supabase initialized successfully.");
+                    
+                } catch (e) {
+                    console.error("Error initializing Supabase:", e);
+                    showWarning(`Error initializing online features: ${e.message}. Online features are disabled.`);
+                    isSupabaseEnabled = false;
+                    // Hide online features
+                    document.getElementById('log-counters-wrapper').style.display = 'none';
+                    document.getElementById('log-wrapper').style.display = 'none';
+                }
+            }
+            
+            // --- FIX: Move BPS option generation here, where DOM is fully loaded ---
+            const bpsSelect = document.getElementById('bps');
+            if (bpsSelect) {
+                 for (let i = 1; i <= 22; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = i;
+                    bpsSelect.appendChild(option);
+                }
+            }
+            // --- END FIX ---
+
+
+            // --- 2. Initialize the App (Core + Online Listeners) ---
+            const allInputs = document.querySelectorAll('.calc-input');
+            const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
+            const dojInput = document.getElementById('doj'); 
+            const sosInput = document.getElementById('sos');
+            const clearLogBtn = document.getElementById('clear-log-btn');
+            const cancelClearBtn = document.getElementById('cancel-clear-btn');
+            const confirmClearBtn = document.getElementById('confirm-clear-btn');
+            const passwordInput = document.getElementById('password-input');
+            const logContainer = document.getElementById('log-container');
+            
+            const pensionerNameInput = document.getElementById('pensioner-name'); // Name Input
+            const payInputs = document.querySelectorAll('.pay-input'); // Pay component inputs
+            const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
+
+            // Add listener for block letters on name input
+            if (pensionerNameInput) {
+                pensionerNameInput.addEventListener('input', (e) => {
+                    e.target.value = e.target.value.toUpperCase();
+                    calculateAndDisplayAll(); // Recalculate on any input change
+                });
+            }
+            
+            // Add listener to the new checkbox toggle
+            if (linkCheckbox) {
+                linkCheckbox.addEventListener('change', () => {
+                    checkInputEnabling();
+                    calculateAndDisplayAll();
+                });
+            }
+
+
+            // Add listener to all date/select inputs
+            allInputs.forEach(input => {
+                if(!input.classList.contains('pay-input') && input.id !== 'pensioner-name' && input.type !== 'checkbox') { // Ignore pay, name, and the new checkbox
+                    input.addEventListener('input', () => { 
+                        calculateAndDisplayAll();
+                        
+                        if (isSupabaseEnabled) {
+                            clearTimeout(logDebounceTimer);
+                            const dobInput = document.getElementById('dob');
+
+                            // Only set timer if all required fields are filled
+                            if (dobInput.value && dojInput.value && sosInput.value && grossPensionPPOInput.value && parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) > 0) { 
+                                logDebounceTimer = setTimeout(() => {
+                                    logCalculation('Input Change (Debounced)');
+                                }, LOG_DEBOUNCE_DELAY);
+                            }
+                        }
+                        checkInputEnabling();
+                    });
+                }
+            });
+            
+            // Add listener to all new pay inputs (uses formatGrossPensionInput to handle currency formatting and recalculation)
+            payInputs.forEach(input => {
+                input.addEventListener('input', formatGrossPensionInput);
+            });
+            
+            // Add listener for manual gross pension input (when link is unchecked)
+            if (grossPensionPPOInput) {
+                grossPensionPPOInput.addEventListener('input', formatGrossPensionInput);
+            }
+            
+            // Only attach these listeners if Supabase is on
+            if (isSupabaseEnabled) {
+                clearLogBtn.addEventListener('click', openPasswordModal);
+                cancelClearBtn.addEventListener('click', closePasswordModal);
+                confirmClearBtn.addEventListener('click', confirmClearLog);
+                
+                logContainer.addEventListener('click', (e) => {
+                    if (e.target.classList.contains('load-log-btn')) {
+                        loadLogData(e.target);
+                    }
+                });
+
+                passwordInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') {
+                        confirmClearLog();
+                    }
+                });
+            } else {
+                 // If Supabase is off, hide the buttons
+                clearLogBtn.style.display = 'none';
+            }
+            
+            initVisitCounter(); // Has internal check, calls fetchLogCount
+            initLogListener();  // Has internal check
+            
+            // Final calculation calls after setting defaults
+            calculateTotalPay();
+            calculateAndDisplayAll();
+            checkInputEnabling();
+        });
+
+    </script>
+</body>
+</html>
