@@ -269,7 +269,7 @@
             .output-group.font-bold .label {
                  margin-bottom: 0.25rem; /* Restore margin for stacked label */
                  font-size: 0.875rem; /* Match font size of standard output label */
-                 width: auto !important; /* Override width */
+                 width: 100% !important; /* Allow full width like other labels */
             }
              /* Ensure the value is visible and indented for bold groups */
             .output-group.font-bold .value {
@@ -288,10 +288,7 @@
                 font-size: 0.875rem; /* 14px */
                 margin-bottom: 0.25rem;
             }
-            /* Hide the empty span in the header on mobile */
-            .output-group.font-bold .label.w-1\/3:first-child {
-                display: none;
-            }
+            /* Removed the display: none rule that was hiding the bold group headers */
         }
         /* --- End Mobile Styles --- */
     </style>
