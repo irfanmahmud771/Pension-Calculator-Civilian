@@ -682,7 +682,7 @@
 
             if (roundToWhole) {
                 // We use Math.ceil() elsewhere for final pension figures, but keep standard rounding for formatter helper
-                roundedValue = Math.ceil(numericValue); // Use ceil for final payable figures
+                roundedValue = Math.round(numericValue); // Use round for final payable figures
                 minimumFractionDigits = 0;
                 maximumFractionDigits = 0;
             } else {
@@ -793,8 +793,8 @@
                 if (entry.pension_raw === '') log_pension_display = 'N/A';
                 
                 // Get the calculated numeric values directly from the stored number fields (pension_current/restored)
-                const pensionCurrent = Math.ceil(parseFloat(entry.pension_current) || 0);
-                const pensionRestored = Math.ceil(parseFloat(entry.pension_restored) || 0);
+                const pensionCurrent = Math.round(parseFloat(entry.pension_current) || 0); // Changed to Round
+                const pensionRestored = Math.round(parseFloat(entry.pension_restored) || 0); // Changed to Round
 
                 // FIX: Read from all-lowercase properties
                 logHTML += `<div class="p-2 border-b border-gray-200"><strong>[${entry.displaytimestamp}] ${entry.triggersource}</strong><br>
@@ -1694,13 +1694,13 @@
             if (netValues.current.length > 0) {
                 finalPensionCurrent = Math.max(basePension, ...netValues.current);
             }
-            finalPensionCurrent = Math.ceil(finalPensionCurrent);
+            finalPensionCurrent = Math.round(finalPensionCurrent); // Changed to Round
 
             let finalPensionRestored = grossPension; 
             if (netValues.restored.length > 0) {
                 finalPensionRestored = Math.max(grossPension, ...netValues.restored);
             }
-            finalPensionRestored = Math.ceil(finalPensionRestored);
+            finalPensionRestored = Math.round(finalPensionRestored); // Changed to Round
             
             // ----------------------------------------------------
             // Medical Allowance Final Calculation (Implementing IF($B$10>DATE(2015,6,30), B17, R17))
@@ -1743,14 +1743,14 @@
                     medicalAllowance = 0;
                 }
                 
-                // Step 3: Apply Ceiling
-                medicalAllowance = Math.ceil(medicalAllowance);
+                // Step 3: Apply Rounding
+                medicalAllowance = Math.round(medicalAllowance); // Changed to Round
             }
             // ----------------------------------------------------
 
             // NEW: Total Payable Calculations (Rounded to whole number, same as Pension)
-            const totalPayableCurrent = Math.ceil(finalPensionCurrent + medicalAllowance);
-            const totalPayableRestored = Math.ceil(finalPensionRestored + medicalAllowance);
+            const totalPayableCurrent = Math.round(finalPensionCurrent + medicalAllowance); // Changed to Round
+            const totalPayableRestored = Math.round(finalPensionRestored + medicalAllowance); // Changed to Round
 
             document.getElementById('gross-pension-output').textContent = formatCurrency(grossPension);
             document.getElementById('net-pension-pre-increase-output').textContent = formatCurrency(basePension);
