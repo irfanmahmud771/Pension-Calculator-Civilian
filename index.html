@@ -365,6 +365,15 @@
                                     <option value="Yes">Yes</option>
                                 </select>
                             </div>
+
+                            <!-- NEW: In Service Death (Hidden by default, shown if Family Pension is Yes) -->
+                            <div class="input-group" id="in-service-death-container" style="display: none;">
+                               <label for="in-service-death">In Service Death</label>
+                                <select id="in-service-death" class="calc-input">
+                                    <option value="No" selected>No</option>
+                                    <option value="Yes">Yes</option>
+                                </select>
+                            </div>
                             
                             <!-- UPDATED: Gross Pension field with toggle -->
                             <div class="input-group">
@@ -859,6 +868,7 @@
             const bpsInput = document.getElementById('bps'); // Added: BPS Input
             const grossPensionInput = document.getElementById('gross-pension-ppo');
             const familyPensionInput = document.getElementById('family-pension');
+            const inServiceDeathInput = document.getElementById('in-service-death');
 
             const totalPayableCurrentOutput = document.getElementById('total-payable-current-output');
             const totalPayableRestoredOutput = document.getElementById('total-payable-restored-output');
@@ -870,7 +880,12 @@
             const log_sos_raw = sosInput.value;
             const log_bps = bpsInput.value; // Added: BPS Value
             const log_pension_raw = grossPensionInput.value.replace(/,/g, '') || '0';
-            const log_family = familyPensionInput.value;
+            
+            // Determine family status for logging (incorporate In Service Death)
+            let log_family = familyPensionInput.value;
+            if (log_family === 'Yes' && inServiceDeathInput && inServiceDeathInput.value === 'Yes') {
+                log_family = 'Yes (In-Service Death)';
+            }
             
             // Get raw numerical values for outputs - FIX: Only keep digits for whole number parsing
             const payableCurrentRawText = totalPayableCurrentOutput.textContent.replace(/[^0-9]/g, '');
@@ -1068,6 +1083,7 @@
             const bpsInput = document.getElementById('bps'); // Added: BPS Input
             const grossPensionInput = document.getElementById('gross-pension-ppo');
             const familyPensionInput = document.getElementById('family-pension');
+            const inServiceDeathInput = document.getElementById('in-service-death');
             
             pensionerNameInput.value = data.name || ''; // Load Name
             dobInput.value = data.dob || '';
@@ -1090,8 +1106,18 @@
                 grossPensionInput.value = '0';
             }
 
-            familyPensionInput.value = data.family || 'No';
-
+            // Parse Family & In Service Death from the stored 'family' string
+            let familyVal = data.family || 'No';
+            let inServiceDeathVal = 'No';
+            
+            if (familyVal.includes('In-Service Death')) {
+                familyVal = 'Yes';
+                inServiceDeathVal = 'Yes';
+            }
+            
+            familyPensionInput.value = familyVal;
+            // The checkInputEnabling call below will show the field, then we set the value
+            
             // Assume manual link is needed if loading from log (since pay component data isn't saved)
             const linkCheckbox = document.getElementById('link-gross-pension');
             linkCheckbox.checked = false; 
@@ -1106,7 +1132,13 @@
             document.getElementById('months-before-superannuation').value = '';
             document.getElementById('pension-penalty').value = '0';
 
-            checkInputEnabling();
+            checkInputEnabling(); // Shows "In Service Death" field if family is Yes
+            
+            // Set In Service Death value AFTER it's revealed
+            if (inServiceDeathInput) {
+                inServiceDeathInput.value = inServiceDeathVal;
+            }
+
             calculateAndDisplayAll();
             
             if (isSupabaseEnabled) {
@@ -1749,7 +1781,15 @@
             }
 
             let commutedPensionPercentage = 0;
-            if (sosDate) {
+            const inServiceDeathInput = document.getElementById('in-service-death');
+            // Check if In Service Death is Yes AND visible (meaning family pension is Yes)
+            const isInServiceDeath = inServiceDeathInput && 
+                                     inServiceDeathInput.parentElement.style.display !== 'none' && 
+                                     inServiceDeathInput.value === 'Yes';
+
+            if (isInServiceDeath) {
+                commutedPensionPercentage = 0.25; 
+            } else if (sosDate) {
                 const date2005 = parseDate('2005-06-30');
                 const date2001 = parseDate('2001-11-30');
                 if (sosDate > date2005) commutedPensionPercentage = 0.35;
@@ -1905,6 +1945,8 @@
             const payComponentsCard = document.getElementById('pay-components-card'); // New Pay Card
             const payInputs = document.querySelectorAll('.pay-input');
             const nameInput = document.getElementById('pensioner-name');
+            const inServiceDeathInput = document.getElementById('in-service-death');
+            const inServiceDeathContainer = document.getElementById('in-service-death-container');
 
             // Check if name is filled
             const nameFilled = nameInput.value.trim() !== '';
@@ -1929,6 +1971,15 @@
             const coreInputsEnabled = nameFilled && dobFilled && dojFilled && sosFilled && bpsFilled;
             
             familyPensionInput.disabled = !coreInputsEnabled;
+            
+            // Toggle In Service Death visibility
+            if (familyPensionInput.value === 'Yes') {
+                if (inServiceDeathContainer) inServiceDeathContainer.style.display = 'block';
+                if (inServiceDeathInput) inServiceDeathInput.disabled = !coreInputsEnabled;
+            } else {
+                if (inServiceDeathContainer) inServiceDeathContainer.style.display = 'none';
+                if (inServiceDeathInput) inServiceDeathInput.value = 'No'; // Reset value
+            }
             
             // Check link state
             const linkEnabled = linkCheckbox.checked;
@@ -2166,6 +2217,7 @@
             const payInputs = document.querySelectorAll('.pay-input'); // Pay component inputs
             const linkCheckbox = document.getElementById('link-gross-pension'); // New Checkbox
             const pensionPenaltyInput = document.getElementById('pension-penalty'); // Penalty Input
+            const inServiceDeathInput = document.getElementById('in-service-death'); // New Input
 
             // Add listener for block letters on name input
             if (pensionerNameInput) {
