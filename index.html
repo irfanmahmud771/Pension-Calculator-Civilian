@@ -640,7 +640,10 @@
     <!-- ====================================================================== -->
     <script type="module">
         // RE-ADDED: Import Supabase createClient
-        import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+        // import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+        
+        // Use global variable from script tag in head instead of module import to avoid export errors
+        const { createClient } = window.supabase || {};
 
         // --- UPDATED: SUPABASE URL AND ANON KEY (Credentials added) ---
         const SUPABASE_URL = "https://bxebqrmrczgbybtfihvz.supabase.co";
@@ -1001,7 +1004,9 @@
         // --- NEW: Execute Show Log Logic ---
         function executeShowLog() {
             isLogVisible = true;
-            document.getElementById('show-log-btn').style.display = 'none'; // Hide button after success
+            // Updated: Check if button exists before hiding
+            const showBtn = document.getElementById('show-log-btn');
+            if(showBtn) showBtn.style.display = 'none'; 
             
             // Update UI Message
             const logContainer = document.getElementById('log-container');
@@ -1420,7 +1425,7 @@
                     if (condition1 || condition2) isEntitled = 'Y';
                 }
 
-                if (isEntitled === 'N') {
+                if (isEntitled === 'N' || percentageToDisplay === '0%') {
                     row.classList.add('hidden');
                 }
                 
@@ -2108,7 +2113,7 @@
                 return;
             }
 
-            // REMOVED: Fetch initial logs on load. Now dependent on "Show Log" button.
+            // FIXED: Do NOT fetch initial logs on load. Wait for "Show Log" button.
             // fetchLogs(); 
 
             // 2. Listen for REALTIME inserts/deletes to refresh the list AND the count
@@ -2117,7 +2122,7 @@
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'logs' },
                     (payload) => {
-                        // A new log was added, re-fetch the count
+                        // A new log was added, re-fetch the count always
                         fetchLogCount();
                         
                         // Only refresh the log list if the user has unlocked visibility
@@ -2130,7 +2135,7 @@
                     'postgres_changes',
                     { event: 'DELETE', schema: 'public', table: 'logs' },
                     (payload) => {
-                        // Logs were deleted (cleared), re-fetch the count
+                        // Logs were deleted (cleared), re-fetch the count always
                         fetchLogCount();
                         
                         // Only refresh the log list if the user has unlocked visibility
@@ -2283,22 +2288,25 @@
 
             // Only attach these listeners if Supabase is on
             if (isSupabaseEnabled) {
-                clearLogBtn.addEventListener('click', () => openPasswordModal('CLEAR'));
-                showLogBtn.addEventListener('click', () => openPasswordModal('SHOW')); // New Listener
-                cancelModalBtn.addEventListener('click', closePasswordModal);
-                confirmModalBtn.addEventListener('click', confirmPasswordAction); // Updated handler
+                // Correctly reference the elements by their current IDs
+                if(clearLogBtn) clearLogBtn.addEventListener('click', () => openPasswordModal('CLEAR'));
+                if(showLogBtn) showLogBtn.addEventListener('click', () => openPasswordModal('SHOW')); // New Listener
+                if(cancelModalBtn) cancelModalBtn.addEventListener('click', closePasswordModal);
+                if(confirmModalBtn) confirmModalBtn.addEventListener('click', confirmPasswordAction); // Updated handler
                 
-                logContainer.addEventListener('click', (e) => {
-                    // Load button
-                    if (e.target.classList.contains('load-log-btn')) {
-                        loadLogData(e.target);
-                    }
-                    // Delete button
-                    if (e.target.classList.contains('delete-log-btn')) {
-                        const id = e.target.dataset.id;
-                        deleteLogEntry(id, e.target);
-                    }
-                });
+                if(logContainer) {
+                    logContainer.addEventListener('click', (e) => {
+                        // Load button
+                        if (e.target.classList.contains('load-log-btn')) {
+                            loadLogData(e.target);
+                        }
+                        // Delete button
+                        if (e.target.classList.contains('delete-log-btn')) {
+                            const id = e.target.dataset.id;
+                            deleteLogEntry(id, e.target);
+                        }
+                    });
+                }
 
                 passwordInput.addEventListener('keypress', (e) => {
                     if (e.key === 'Enter') {
@@ -2307,8 +2315,8 @@
                 });
             } else {
                  // If Supabase is off, hide the buttons
-                clearLogBtn.style.display = 'none';
-                showLogBtn.style.display = 'none';
+                if(clearLogBtn) clearLogBtn.style.display = 'none';
+                if(showLogBtn) showLogBtn.style.display = 'none';
             }
             
             initVisitCounter(); // Has internal check, calls fetchLogCount
