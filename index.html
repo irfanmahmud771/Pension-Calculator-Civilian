@@ -671,8 +671,9 @@
 
         // Debounce timer for logging
         let logDebounceTimer = null;
-        // RESTORED: Change debounce delay back to 10000ms (10 seconds)
-        const LOG_DEBOUNCE_DELAY = 10000;
+        // Debounced Supabase sync delay: 10 seconds
+        const LOG_DEBOUNCE_DELAY_SECONDS = 10;
+        const LOG_DEBOUNCE_DELAY = LOG_DEBOUNCE_DELAY_SECONDS * 1000;
 
         // NEW: Store calculated values for logging
         let currentCalculatedValues = {
