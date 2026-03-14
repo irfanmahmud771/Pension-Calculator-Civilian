@@ -802,6 +802,20 @@
         // --- 3. CORE CALCULATION LOGIC (Functions) ---
 
         // RE-ADDED: Log related functions
+        function getLogSortTimestamp(entry) {
+            if (entry && entry.displaytimestamp) {
+                const match = String(entry.displaytimestamp).match(/^(\d{2})-(\d{2})-(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+                if (match) {
+                    const [, dd, mm, yyyy, hh, mi, ss] = match;
+                    const parsed = Date.parse(`${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`);
+                    if (!Number.isNaN(parsed)) return parsed;
+                }
+            }
+
+            const createdAtParsed = Date.parse(entry?.created_at || '');
+            return Number.isNaN(createdAtParsed) ? 0 : createdAtParsed;
+        }
+
         async function renderLog(logArray) {
             const logContainer = document.getElementById('log-container');
             if (!logContainer) return;
@@ -811,8 +825,10 @@
                 return;
             }
 
+            const sortedLogs = [...logArray].sort((a, b) => getLogSortTimestamp(b) - getLogSortTimestamp(a));
+
             let logHTML = '';
-            for (const entry of logArray) {
+            for (const entry of sortedLogs) {
                 const log_dob_display = formatDateForLog(entry.dob_raw);
                 const log_doj_display = formatDateForLog(entry.doj_raw);
                 const log_sos_display = formatDateForLog(entry.sos_raw);
