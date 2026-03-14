@@ -1129,18 +1129,26 @@
             bpsInput.value = data.bps || ''; // Added: BPS Value
 
             const pensionValue = data.pension || '';
-            grossPensionInput.value = pensionValue;
+            const basicPayFromLog = parseFloat((data.basicPay || '').toString().replace(/,/g, '')) || 0;
+            const shouldRecalculateGrossPension = basicPayFromLog > 0;
 
-            const parts = pensionValue.split('.');
-            let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-            let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+            if (!shouldRecalculateGrossPension) {
+                grossPensionInput.value = pensionValue;
 
-            grossPensionInput.value = integerPart;
+                const parts = pensionValue.split('.');
+                let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+
+                grossPensionInput.value = integerPart;
                 if (decimalPart) {
-                grossPensionInput.value += '.' + decimalPart;
-            }
-            if (parseFloat(pensionValue) === 0) {
-                grossPensionInput.value = '0';
+                    grossPensionInput.value += '.' + decimalPart;
+                }
+                if (parseFloat(pensionValue) === 0) {
+                    grossPensionInput.value = '0';
+                }
+            } else {
+                // Basic Pay exists in log, so gross pension should be recalculated from pay components.
+                grossPensionInput.value = '';
             }
 
             // Parse Family & In Service Death from the stored 'family' string
@@ -1175,9 +1183,9 @@
                     : '';
             });
 
-            // If pay components were saved, keep auto-link enabled so Gross Pension is rebuilt from DB values.
-            // Fallback to manual mode for older logs where these fields do not exist.
-            linkCheckbox.checked = hasSavedPayComponents ? true : false;
+            // Required behavior: if Basic Pay > 0 in log, force Auto Link ON and recalculate Gross Pension from pay data.
+            // Otherwise keep backward compatibility for old/manual records.
+            linkCheckbox.checked = shouldRecalculateGrossPension ? true : hasSavedPayComponents;
 
             if (!hasSavedPayComponents) {
                 document.getElementById('total-pay').value = '';
