@@ -999,12 +999,12 @@
             clearTimeout(logDebounceTimer);
 
             const cnicInput = document.getElementById('cnic');
-            const dobInput = document.getElementById('dob');
-            const dojInput = document.getElementById('doj');
-            const sosInput = document.getElementById('sos');
-            const grossPensionInput = document.getElementById('gross-pension-ppo');
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
 
-            if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) {
+            // Save on any edited field once a valid CNIC is present.
+            // Additional required-field checks are intentionally avoided so updates
+            // are not skipped when a user edits/clears a single field.
+            if (cnicInput && cnicPattern.test(cnicInput.value.trim())) {
                 logDebounceTimer = setTimeout(() => {
                     logCalculation(triggerSource);
                 }, LOG_DEBOUNCE_DELAY);
@@ -1260,19 +1260,7 @@
             calculateTotalPay();
             calculateAndDisplayAll();
 
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const cnicInput = document.getElementById('cnic');
-                const dobInput = document.getElementById('dob');
-                const dojInput = document.getElementById('doj');
-                const sosInput = document.getElementById('sos');
-                const grossPensionInput = document.getElementById('gross-pension-ppo');
-                if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            scheduleLogCalculation('Input Change (Debounced)');
 
             checkInputEnabling();
         }
@@ -1980,18 +1968,8 @@
             currentCalculatedValues.restorationDate = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
             currentCalculatedValues.medicalAllowance = medicalAllowance;
 
-            // Trigger log if a valid calculation occurred
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const dobInput = document.getElementById('dob');
-
-                // Only set timer if all required fields are filled
-                if (document.getElementById('cnic').value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionPPO > 0) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            // Trigger debounced log sync after calculations
+            scheduleLogCalculation('Input Change (Debounced)');
         }
 
         // --- Supabase Log Count Fetcher ---
