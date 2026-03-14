@@ -993,6 +993,24 @@
             }
         }
 
+        function scheduleLogCalculation(triggerSource) {
+            if (!isSupabaseEnabled) return;
+
+            clearTimeout(logDebounceTimer);
+
+            const cnicInput = document.getElementById('cnic');
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+
+            // Save on any edited field once a valid CNIC is present.
+            // Additional required-field checks are intentionally avoided so updates
+            // are not skipped when a user edits/clears a single field.
+            if (cnicInput && cnicPattern.test(cnicInput.value.trim())) {
+                logDebounceTimer = setTimeout(() => {
+                    logCalculation(triggerSource);
+                }, LOG_DEBOUNCE_DELAY);
+            }
+        }
+
         // --- NEW: Password Modal Functions Logic ---
         function openPasswordModal(action, id = null) {
             currentPasswordAction = action; // 'SHOW', 'CLEAR', or 'DELETE_SINGLE'
@@ -1242,19 +1260,7 @@
             calculateTotalPay();
             calculateAndDisplayAll();
 
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const cnicInput = document.getElementById('cnic');
-                const dobInput = document.getElementById('dob');
-                const dojInput = document.getElementById('doj');
-                const sosInput = document.getElementById('sos');
-                const grossPensionInput = document.getElementById('gross-pension-ppo');
-                if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            scheduleLogCalculation('Input Change (Debounced)');
 
             checkInputEnabling();
         }
@@ -1962,18 +1968,8 @@
             currentCalculatedValues.restorationDate = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
             currentCalculatedValues.medicalAllowance = medicalAllowance;
 
-            // Trigger log if a valid calculation occurred
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const dobInput = document.getElementById('dob');
-
-                // Only set timer if all required fields are filled
-                if (document.getElementById('cnic').value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionPPO > 0) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            // Trigger debounced log sync after calculations
+            scheduleLogCalculation('Input Change (Debounced)');
         }
 
         // --- Supabase Log Count Fetcher ---
@@ -2369,6 +2365,8 @@
 
                     // Then perform calculations
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('Pensioner Name Change (Debounced)');
                 });
             }
 
@@ -2383,6 +2381,8 @@
 
                     checkInputEnabling();
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('CNIC Change (Debounced)');
                 });
             }
 
@@ -2391,6 +2391,8 @@
                 linkCheckbox.addEventListener('change', () => {
                     checkInputEnabling();
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('Auto Link Toggle (Debounced)');
                 });
             }
 
@@ -2405,17 +2407,7 @@
                         // Then perform calculations
                         calculateAndDisplayAll();
 
-                        if (isSupabaseEnabled) {
-                            clearTimeout(logDebounceTimer);
-                            const dobInput = document.getElementById('dob');
-
-                            // Only set timer if all required fields are filled
-                            if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionPPOInput.value && parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) > 0) {
-                                logDebounceTimer = setTimeout(() => {
-                                    logCalculation('Input Change (Debounced)');
-                                }, LOG_DEBOUNCE_DELAY);
-                            }
-                        }
+                        scheduleLogCalculation('Input Change (Debounced)');
                     });
                 }
             });
