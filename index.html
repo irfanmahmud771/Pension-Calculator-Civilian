@@ -857,7 +857,11 @@
                             data-sos="${entry.sos_raw || ''}"
                             data-bps="${entry.bps || ''}"
                             data-pension="${entry.pension_raw || '0'}"
-                            data-family="${entry.family}">
+                            data-family="${entry.family}"
+                            data-basic-pay="${entry.basic_pay ?? ''}"
+                            data-personnel-pay="${entry.personnel_pay ?? ''}"
+                            data-qualification-pay="${entry.qualification_pay ?? ''}"
+                            data-other-pay="${entry.other_pay ?? ''}">
                             Load this Data
                         </button>
                         <!-- NEW: Delete Single Log Button -->
@@ -897,6 +901,10 @@
             const log_sos_raw = sosInput.value;
             const log_bps = bpsInput.value; // Added: BPS Value
             const log_pension_raw = grossPensionInput.value.replace(/,/g, '') || '0';
+            const log_basic_pay = document.getElementById('basic-pay').value.replace(/,/g, '') || '0';
+            const log_personnel_pay = document.getElementById('personnel-pay').value.replace(/,/g, '') || '0';
+            const log_qualification_pay = document.getElementById('qualification-pay').value.replace(/,/g, '') || '0';
+            const log_other_pay = document.getElementById('other-pay').value.replace(/,/g, '') || '0';
 
             // CNIC format must be complete before logging/saving
             const cnicPattern = /^\d{5}-\d{7}-\d$/;
@@ -938,6 +946,10 @@
                 bps: log_bps, // Added: BPS Field
                 family: log_family,
                 pension_raw: log_pension_raw,
+                basic_pay: log_basic_pay,
+                personnel_pay: log_personnel_pay,
+                qualification_pay: log_qualification_pay,
+                other_pay: log_other_pay,
 
                 // Output Fields (Total Payable is calculated after increases/medical)
                 pension_current: payableCurrentRaw, // Stored as NUMERIC
@@ -1117,18 +1129,26 @@
             bpsInput.value = data.bps || ''; // Added: BPS Value
 
             const pensionValue = data.pension || '';
-            grossPensionInput.value = pensionValue;
+            const basicPayFromLog = parseFloat((data.basicPay || '').toString().replace(/,/g, '')) || 0;
+            const shouldRecalculateGrossPension = basicPayFromLog > 0;
 
-            const parts = pensionValue.split('.');
-            let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-            let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+            if (!shouldRecalculateGrossPension) {
+                grossPensionInput.value = pensionValue;
 
-            grossPensionInput.value = integerPart;
+                const parts = pensionValue.split('.');
+                let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+
+                grossPensionInput.value = integerPart;
                 if (decimalPart) {
-                grossPensionInput.value += '.' + decimalPart;
-            }
-            if (parseFloat(pensionValue) === 0) {
-                grossPensionInput.value = '0';
+                    grossPensionInput.value += '.' + decimalPart;
+                }
+                if (parseFloat(pensionValue) === 0) {
+                    grossPensionInput.value = '0';
+                }
+            } else {
+                // Basic Pay exists in log, so gross pension should be recalculated from pay components.
+                grossPensionInput.value = '';
             }
 
             // Parse Family & In Service Death from the stored 'family' string
@@ -1143,19 +1163,38 @@
             familyPensionInput.value = familyVal;
             // The checkInputEnabling call below will show the field, then we set the value
 
-            // Assume manual link is needed if loading from log (since pay component data isn't saved)
             const linkCheckbox = document.getElementById('link-gross-pension');
-            linkCheckbox.checked = false;
 
-            // Clear pay components since we don't save them in the log
-            const payInputs = document.querySelectorAll('.pay-input');
-            payInputs.forEach(input => input.value = '');
-            document.getElementById('total-pay').value = '';
-            // Clear new Gross Pension field in Pay Components card
-            document.getElementById('gross-pension-calc').value = '';
-             // Clear penalty fields
-            document.getElementById('months-before-superannuation').value = '';
-            document.getElementById('pension-penalty').value = '0';
+            const payFieldMap = {
+                'basic-pay': data.basicPay,
+                'personnel-pay': data.personnelPay,
+                'qualification-pay': data.qualificationPay,
+                'other-pay': data.otherPay
+            };
+
+            const parsedPayValues = Object.values(payFieldMap)
+                .map((value) => parseFloat((value || '').toString().replace(/,/g, '')) || 0);
+            const hasPayEmolumentsData = parsedPayValues.some((value) => value > 0);
+
+            Object.entries(payFieldMap).forEach(([id, value]) => {
+                const input = document.getElementById(id);
+                const numericValue = parseFloat((value || '').toString().replace(/,/g, ''));
+                input.value = Number.isFinite(numericValue) && numericValue > 0
+                    ? formatCurrency(numericValue, false).replace('Rs. ', '')
+                    : '';
+            });
+
+            // Required behavior:
+            // - If Basic Pay > 0, force Auto Link ON and recalculate Gross Pension from pay data.
+            // - If no pay emoluments data exists, keep Auto Link OFF and use gross pension from saved DB value.
+            linkCheckbox.checked = shouldRecalculateGrossPension ? true : false;
+
+            if (!hasPayEmolumentsData) {
+                document.getElementById('total-pay').value = '';
+                document.getElementById('gross-pension-calc').value = '';
+                document.getElementById('months-before-superannuation').value = '';
+                document.getElementById('pension-penalty').value = '0';
+            }
 
             checkInputEnabling(); // Shows "In Service Death" field if family is Yes
 
