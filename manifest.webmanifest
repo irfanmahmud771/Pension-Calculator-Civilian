@@ -1,0 +1,19 @@
+{
+  "name": "Pension Calculator Civilan",
+  "short_name": "Pension Civilan",
+  "description": "Installable pension calculator app for Windows and Android.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#1f2937",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "./assets/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
