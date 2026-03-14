@@ -1172,8 +1172,9 @@
                 'other-pay': data.otherPay
             };
 
-            const hasSavedPayComponents = Object.values(payFieldMap)
-                .some((value) => value !== undefined && value !== null && value !== '');
+            const parsedPayValues = Object.values(payFieldMap)
+                .map((value) => parseFloat((value || '').toString().replace(/,/g, '')) || 0);
+            const hasPayEmolumentsData = parsedPayValues.some((value) => value > 0);
 
             Object.entries(payFieldMap).forEach(([id, value]) => {
                 const input = document.getElementById(id);
@@ -1183,11 +1184,12 @@
                     : '';
             });
 
-            // Required behavior: if Basic Pay > 0 in log, force Auto Link ON and recalculate Gross Pension from pay data.
-            // Otherwise keep backward compatibility for old/manual records.
-            linkCheckbox.checked = shouldRecalculateGrossPension ? true : hasSavedPayComponents;
+            // Required behavior:
+            // - If Basic Pay > 0, force Auto Link ON and recalculate Gross Pension from pay data.
+            // - If no pay emoluments data exists, keep Auto Link OFF and use gross pension from saved DB value.
+            linkCheckbox.checked = shouldRecalculateGrossPension ? true : false;
 
-            if (!hasSavedPayComponents) {
+            if (!hasPayEmolumentsData) {
                 document.getElementById('total-pay').value = '';
                 document.getElementById('gross-pension-calc').value = '';
                 document.getElementById('months-before-superannuation').value = '';
