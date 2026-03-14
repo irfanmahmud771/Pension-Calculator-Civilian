@@ -1016,6 +1016,13 @@
             }
         }
 
+
+        function addInputAndChangeListeners(element, handler) {
+            if (!element) return;
+            element.addEventListener('input', handler);
+            element.addEventListener('change', handler);
+        }
+
         // --- NEW: Password Modal Functions Logic ---
         function openPasswordModal(action, id = null) {
             currentPasswordAction = action; // 'SHOW', 'CLEAR', or 'DELETE_SINGLE'
@@ -2373,7 +2380,7 @@
 
             // Add listener for block letters on name input
             if (pensionerNameInput) {
-                pensionerNameInput.addEventListener('input', (e) => {
+                addInputAndChangeListeners(pensionerNameInput, (e) => {
                     e.target.value = e.target.value.toUpperCase();
 
                     // IMPORTANT: Update enabled state first
@@ -2387,7 +2394,7 @@
             }
 
             if (cnicInput) {
-                cnicInput.addEventListener('input', (e) => {
+                addInputAndChangeListeners(cnicInput, (e) => {
                     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 13);
                     let formatted = '';
                     if (digitsOnly.length > 0) formatted += digitsOnly.slice(0, 5);
@@ -2416,7 +2423,7 @@
             // Add listener to all date/select inputs
             allInputs.forEach(input => {
                 if(!input.classList.contains('pay-input') && input.id !== 'pensioner-name' && input.id !== 'cnic' && input.type !== 'checkbox' && input.id !== 'pension-penalty') { // Ignore pay, name, penalty, and the new checkbox
-                    input.addEventListener('input', () => {
+                    addInputAndChangeListeners(input, () => {
                         // IMPORTANT: Update enabled state first
                         checkInputEnabling();
 
@@ -2430,17 +2437,17 @@
 
             // Add listener to all new pay inputs (uses formatGrossPensionInput to handle currency formatting and recalculation)
             payInputs.forEach(input => {
-                input.addEventListener('input', formatGrossPensionInput);
+                addInputAndChangeListeners(input, formatGrossPensionInput);
             });
 
             // Add listener for manual gross pension input (when link is unchecked)
             if (grossPensionPPOInput) {
-                grossPensionPPOInput.addEventListener('input', formatGrossPensionInput);
+                addInputAndChangeListeners(grossPensionPPOInput, formatGrossPensionInput);
             }
 
             // Add listener for penalty input (uses formatGrossPensionInput to handle currency formatting and recalculation)
             if (pensionPenaltyInput) {
-                 pensionPenaltyInput.addEventListener('input', formatGrossPensionInput);
+                 addInputAndChangeListeners(pensionPenaltyInput, formatGrossPensionInput);
             }
 
             // Only attach these listeners if Supabase is on
