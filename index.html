@@ -671,8 +671,9 @@
 
         // Debounce timer for logging
         let logDebounceTimer = null;
-        // RESTORED: Change debounce delay back to 10000ms (10 seconds)
-        const LOG_DEBOUNCE_DELAY = 10000;
+        // Debounced Supabase sync delay: 10 seconds
+        const LOG_DEBOUNCE_DELAY_SECONDS = 10;
+        const LOG_DEBOUNCE_DELAY = LOG_DEBOUNCE_DELAY_SECONDS * 1000;
 
         // NEW: Store calculated values for logging
         let currentCalculatedValues = {
@@ -968,29 +969,68 @@
                 saveError = upsertError;
 
                 // Fallback path for environments where unique index on cnic is not yet created.
+                // Prefer update+insert (upsert emulation) to avoid requiring DELETE permission.
                 if (saveError) {
-                    console.warn('Upsert failed, falling back to delete+insert for CNIC:', saveError.message || saveError);
-                    const { error: deleteError } = await supabaseClient
-                        .from('logs')
-                        .delete()
-                        .eq('cnic', log_cnic);
+                    console.warn('Upsert failed, falling back to update+insert for CNIC:', saveError.message || saveError);
 
-                    if (deleteError) {
-                        console.warn('Fallback delete by CNIC failed:', deleteError.message || deleteError);
+                    const { data: updatedRows, error: updateError } = await supabaseClient
+                        .from('logs')
+                        .update(logEntry)
+                        .eq('cnic', log_cnic)
+                        .select('id');
+
+                    if (updateError) {
+                        console.warn('Fallback update by CNIC failed:', updateError.message || updateError);
                     }
 
-                    const { error: insertError } = await supabaseClient
-                        .from('logs')
-                        .insert(logEntry);
+                    const hasUpdatedExistingRow = Array.isArray(updatedRows) && updatedRows.length > 0;
 
-                    saveError = insertError;
+                    if (hasUpdatedExistingRow) {
+                        saveError = null;
+                    } else {
+                        const { error: insertError } = await supabaseClient
+                            .from('logs')
+                            .insert(logEntry);
+
+                        saveError = insertError;
+                    }
                 }
 
                 if (saveError) throw saveError;
                 console.log('Log entry saved (CNIC synced):', logEntry);
+
+                // Keep visible log list in sync even if realtime UPDATE is unavailable.
+                if (isLogVisible) {
+                    fetchLogs();
+                }
             } catch (e) {
-                console.error('Error adding document: ', e);
+                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic });
             }
+        }
+
+        function scheduleLogCalculation(triggerSource) {
+            if (!isSupabaseEnabled) return;
+
+            clearTimeout(logDebounceTimer);
+
+            const cnicInput = document.getElementById('cnic');
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+
+            // Save on any edited field once a valid CNIC is present.
+            // Additional required-field checks are intentionally avoided so updates
+            // are not skipped when a user edits/clears a single field.
+            if (cnicInput && cnicPattern.test(cnicInput.value.trim())) {
+                logDebounceTimer = setTimeout(() => {
+                    logCalculation(triggerSource);
+                }, LOG_DEBOUNCE_DELAY);
+            }
+        }
+
+
+        function addInputAndChangeListeners(element, handler) {
+            if (!element) return;
+            element.addEventListener('input', handler);
+            element.addEventListener('change', handler);
         }
 
         // --- NEW: Password Modal Functions Logic ---
@@ -1242,19 +1282,7 @@
             calculateTotalPay();
             calculateAndDisplayAll();
 
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const cnicInput = document.getElementById('cnic');
-                const dobInput = document.getElementById('dob');
-                const dojInput = document.getElementById('doj');
-                const sosInput = document.getElementById('sos');
-                const grossPensionInput = document.getElementById('gross-pension-ppo');
-                if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            scheduleLogCalculation('Input Change (Debounced)');
 
             checkInputEnabling();
         }
@@ -1962,18 +1990,8 @@
             currentCalculatedValues.restorationDate = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
             currentCalculatedValues.medicalAllowance = medicalAllowance;
 
-            // Trigger log if a valid calculation occurred
-            if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                const dobInput = document.getElementById('dob');
-
-                // Only set timer if all required fields are filled
-                if (document.getElementById('cnic').value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionPPO > 0) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Input Change (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
-            }
+            // Trigger debounced log sync after calculations
+            scheduleLogCalculation('Input Change (Debounced)');
         }
 
         // --- Supabase Log Count Fetcher ---
@@ -2212,12 +2230,13 @@
             // FIXED: Do NOT fetch initial logs on load. Wait for "Show Log" button.
             // fetchLogs();
 
-            // 2. Listen for REALTIME inserts/deletes to refresh the list AND the count
+            // 2. Listen for REALTIME insert/update/delete to refresh the list and count.
+            // UPDATE is required because CNIC-based upsert usually updates existing rows.
             supabaseClient.channel('logs-channel')
                 .on(
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'logs' },
-                    (payload) => {
+                    () => {
                         // A new log was added, re-fetch the count always
                         fetchLogCount();
 
@@ -2229,8 +2248,18 @@
                 )
                 .on(
                     'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'logs' },
+                    () => {
+                        // Existing log updated (e.g., pay fields), refresh visible list
+                        if (isLogVisible) {
+                            fetchLogs();
+                        }
+                    }
+                )
+                .on(
+                    'postgres_changes',
                     { event: 'DELETE', schema: 'public', table: 'logs' },
-                    (payload) => {
+                    () => {
                         // Logs were deleted (cleared), re-fetch the count always
                         fetchLogCount();
 
@@ -2361,7 +2390,7 @@
 
             // Add listener for block letters on name input
             if (pensionerNameInput) {
-                pensionerNameInput.addEventListener('input', (e) => {
+                addInputAndChangeListeners(pensionerNameInput, (e) => {
                     e.target.value = e.target.value.toUpperCase();
 
                     // IMPORTANT: Update enabled state first
@@ -2369,11 +2398,13 @@
 
                     // Then perform calculations
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('Pensioner Name Change (Debounced)');
                 });
             }
 
             if (cnicInput) {
-                cnicInput.addEventListener('input', (e) => {
+                addInputAndChangeListeners(cnicInput, (e) => {
                     const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 13);
                     let formatted = '';
                     if (digitsOnly.length > 0) formatted += digitsOnly.slice(0, 5);
@@ -2383,6 +2414,8 @@
 
                     checkInputEnabling();
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('CNIC Change (Debounced)');
                 });
             }
 
@@ -2391,6 +2424,8 @@
                 linkCheckbox.addEventListener('change', () => {
                     checkInputEnabling();
                     calculateAndDisplayAll();
+
+                    scheduleLogCalculation('Auto Link Toggle (Debounced)');
                 });
             }
 
@@ -2398,41 +2433,31 @@
             // Add listener to all date/select inputs
             allInputs.forEach(input => {
                 if(!input.classList.contains('pay-input') && input.id !== 'pensioner-name' && input.id !== 'cnic' && input.type !== 'checkbox' && input.id !== 'pension-penalty') { // Ignore pay, name, penalty, and the new checkbox
-                    input.addEventListener('input', () => {
+                    addInputAndChangeListeners(input, () => {
                         // IMPORTANT: Update enabled state first
                         checkInputEnabling();
 
                         // Then perform calculations
                         calculateAndDisplayAll();
 
-                        if (isSupabaseEnabled) {
-                            clearTimeout(logDebounceTimer);
-                            const dobInput = document.getElementById('dob');
-
-                            // Only set timer if all required fields are filled
-                            if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionPPOInput.value && parseFloat(grossPensionPPOInput.value.replace(/,/g, '')) > 0) {
-                                logDebounceTimer = setTimeout(() => {
-                                    logCalculation('Input Change (Debounced)');
-                                }, LOG_DEBOUNCE_DELAY);
-                            }
-                        }
+                        scheduleLogCalculation('Input Change (Debounced)');
                     });
                 }
             });
 
             // Add listener to all new pay inputs (uses formatGrossPensionInput to handle currency formatting and recalculation)
             payInputs.forEach(input => {
-                input.addEventListener('input', formatGrossPensionInput);
+                addInputAndChangeListeners(input, formatGrossPensionInput);
             });
 
             // Add listener for manual gross pension input (when link is unchecked)
             if (grossPensionPPOInput) {
-                grossPensionPPOInput.addEventListener('input', formatGrossPensionInput);
+                addInputAndChangeListeners(grossPensionPPOInput, formatGrossPensionInput);
             }
 
             // Add listener for penalty input (uses formatGrossPensionInput to handle currency formatting and recalculation)
             if (pensionPenaltyInput) {
-                 pensionPenaltyInput.addEventListener('input', formatGrossPensionInput);
+                 addInputAndChangeListeners(pensionPenaltyInput, formatGrossPensionInput);
             }
 
             // Only attach these listeners if Supabase is on
