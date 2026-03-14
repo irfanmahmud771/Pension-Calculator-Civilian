@@ -969,22 +969,31 @@
                 saveError = upsertError;
 
                 // Fallback path for environments where unique index on cnic is not yet created.
+                // Prefer update+insert (upsert emulation) to avoid requiring DELETE permission.
                 if (saveError) {
-                    console.warn('Upsert failed, falling back to delete+insert for CNIC:', saveError.message || saveError);
-                    const { error: deleteError } = await supabaseClient
-                        .from('logs')
-                        .delete()
-                        .eq('cnic', log_cnic);
+                    console.warn('Upsert failed, falling back to update+insert for CNIC:', saveError.message || saveError);
 
-                    if (deleteError) {
-                        console.warn('Fallback delete by CNIC failed:', deleteError.message || deleteError);
+                    const { data: updatedRows, error: updateError } = await supabaseClient
+                        .from('logs')
+                        .update(logEntry)
+                        .eq('cnic', log_cnic)
+                        .select('id');
+
+                    if (updateError) {
+                        console.warn('Fallback update by CNIC failed:', updateError.message || updateError);
                     }
 
-                    const { error: insertError } = await supabaseClient
-                        .from('logs')
-                        .insert(logEntry);
+                    const hasUpdatedExistingRow = Array.isArray(updatedRows) && updatedRows.length > 0;
 
-                    saveError = insertError;
+                    if (hasUpdatedExistingRow) {
+                        saveError = null;
+                    } else {
+                        const { error: insertError } = await supabaseClient
+                            .from('logs')
+                            .insert(logEntry);
+
+                        saveError = insertError;
+                    }
                 }
 
                 if (saveError) throw saveError;
@@ -995,7 +1004,7 @@
                     fetchLogs();
                 }
             } catch (e) {
-                console.error('Error adding document: ', e);
+                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic });
             }
         }
 
