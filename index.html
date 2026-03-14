@@ -1955,6 +1955,10 @@
             const nameFilled = nameInput.value.trim() !== '';
             dobInput.disabled = !nameFilled;
 
+            // Enable DOJ only after DOB has been entered
+            const dobFilled = dobInput.value !== '';
+            dojInput.disabled = !dobFilled;
+
             // Check if DOJ is filled
             const dojFilled = dojInput.value !== '';
             sosInput.disabled = !dojFilled;
