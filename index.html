@@ -886,7 +886,7 @@
             const restorationDateOutput = document.getElementById('restoration-date-output');
 
             const log_pensioner_name = pensionerNameInput.value;
-            const log_cnic = cnicInput.value;
+            const log_cnic = cnicInput.value.trim();
             const log_dob_raw = dobInput.value;
             const log_doj_raw = dojInput.value;
             const log_sos_raw = sosInput.value;
@@ -894,7 +894,8 @@
             const log_pension_raw = grossPensionInput.value.replace(/,/g, '') || '0';
 
             // CNIC format must be complete before logging/saving
-            if (log_cnic.length !== 15) return;
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+            if (!cnicPattern.test(log_cnic)) return;
 
             // Determine family status for logging (incorporate In Service Death)
             let log_family = familyPensionInput.value;
@@ -940,26 +941,38 @@
             };
 
             try {
-                // 1. Check for and delete duplicates
-                // CNIC is treated as the primary key: replace any previous row with same CNIC.
-                const { error: deleteError } = await supabaseClient
+                // Preferred path: rely on DB-level unique/primary key on `cnic`.
+                // If `cnic` is unique in Supabase, this updates existing rows automatically.
+                let saveError = null;
+                const { error: upsertError } = await supabaseClient
                     .from('logs')
-                    .delete()
-                    .eq('cnic', log_cnic);
+                    .upsert(logEntry, { onConflict: 'cnic' });
 
-                if (deleteError) {
-                    console.warn("Error checking/deleting duplicate log:", deleteError);
-                    // Don't stop, proceed to insert anyway
+                saveError = upsertError;
+
+                // Fallback path for environments where unique index on cnic is not yet created.
+                if (saveError) {
+                    console.warn('Upsert failed, falling back to delete+insert for CNIC:', saveError.message || saveError);
+                    const { error: deleteError } = await supabaseClient
+                        .from('logs')
+                        .delete()
+                        .eq('cnic', log_cnic);
+
+                    if (deleteError) {
+                        console.warn('Fallback delete by CNIC failed:', deleteError.message || deleteError);
+                    }
+
+                    const { error: insertError } = await supabaseClient
+                        .from('logs')
+                        .insert(logEntry);
+
+                    saveError = insertError;
                 }
 
-                // 2. Insert the new log entry
-                const { error: insertError } = await supabaseClient.from('logs').insert(logEntry);
-                if (insertError) {
-                    throw insertError;
-                }
-                console.log("Log entry saved (or refreshed):", logEntry);
+                if (saveError) throw saveError;
+                console.log('Log entry saved (CNIC synced):', logEntry);
             } catch (e) {
-                console.error("Error adding document: ", e);
+                console.error('Error adding document: ', e);
             }
         }
 
