@@ -399,7 +399,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         
                         <div class="input-group">
-                            <label for="basic-pay">Basic Pay / 24 Months Avg Pay</label>
+                            <label id="basic-pay-label" for="basic-pay">Basic Pay</label>
                             <!-- Disabled by default -->
                             <input type="text" id="basic-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
@@ -411,13 +411,13 @@
                         </div>
 
                         <div class="input-group">
-                            <label for="qualification-pay">Qualification Pay</label>
+                            <label for="qualification-pay">Other Pay</label>
                             <!-- Disabled by default -->
                             <input type="text" id="qualification-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
                         
                         <div class="input-group">
-                            <label for="other-pay">Other Pay</label>
+                            <label for="other-pay">Usual Increment</label>
                             <!-- Disabled by default -->
                             <input type="text" id="other-pay" class="pay-input calc-input" min="0" disabled>
                         </div>
@@ -1950,6 +1950,8 @@
             const nameInput = document.getElementById('pensioner-name');
             const inServiceDeathInput = document.getElementById('in-service-death');
             const inServiceDeathContainer = document.getElementById('in-service-death-container');
+            const basicPayLabel = document.getElementById('basic-pay-label');
+            const otherPayInput = document.getElementById('other-pay');
 
             // Check if name is filled
             const nameFilled = nameInput.value.trim() !== '';
@@ -1966,6 +1968,15 @@
             // Check if SOS is filled
             const sosFilled = sosInput.value !== '';
             bpsInput.disabled = !sosFilled;
+
+            const sosDate = parseDate(sosInput.value);
+            const avgPayCutoffDate = parseDate('2024-12-31');
+            const shouldUseAvgPayLabel = sosDate && sosDate > avgPayCutoffDate;
+            const isUsualIncrementEnabledByDate = sosDate && (sosDate.getUTCMonth() > 5 || (sosDate.getUTCMonth() === 5 && sosDate.getUTCDate() > 1));
+
+            if (basicPayLabel) {
+                basicPayLabel.textContent = shouldUseAvgPayLabel ? '24 Months Avg Pay Emoluments' : 'Basic Pay';
+            }
 
             // Check if BPS is filled
             const bpsFilled = bpsInput.value !== '';
@@ -1993,6 +2004,15 @@
                 input.disabled = !payInputsEnabled;
             });
 
+            // Usual Increment (other-pay) is only enabled when date of retirement is greater than 01 June
+            if (otherPayInput) {
+                const shouldEnableOtherPay = payInputsEnabled && isUsualIncrementEnabledByDate;
+                otherPayInput.disabled = !shouldEnableOtherPay;
+                if (!shouldEnableOtherPay) {
+                    otherPayInput.value = '';
+                }
+            }
+
             // Gross Pension is read-only if linked, editable if unlinked but enabled
             grossPensionPPOInput.readOnly = linkEnabled;
             grossPensionPPOInput.classList.toggle('manual-input', !linkEnabled);
@@ -2004,7 +2024,6 @@
             }
             
             // --- NEW LOGIC: Check if Penalty Card should be visible ---
-            const sosDate = parseDate(sosInput.value);
             const penaltyCutoff = new Date('2024-09-09T00:00:00Z');
             const isPenaltyApplicable = sosDate && sosDate > penaltyCutoff;
             
