@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pension Calculation App</title>
+    <title>Pension Calculator Civilan</title>
+    <meta name="theme-color" content="#1f2937">
+    <link rel="manifest" href="manifest.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- RE-ADDED: Supabase JS Client for logging and counter -->
@@ -304,8 +306,11 @@
     <div class="container mx-auto p-4 md:p-8 relative">
 
         <header class="text-center mb-8 mt-4 md:mt-0">
-            <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Pension Calculator Civilian</h1>
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Pension Calculator Civilan</h1>
             <p class="text-red-600 mt-1">(For Retirement date 01 July, 1986 to till now)</p>
+            <button id="install-app-btn" type="button" class="mt-4 inline-flex items-center rounded-lg bg-gray-800 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-gray-700" style="display:none;">
+                Install App (Windows / Android)
+            </button>
         </header>
 
         <!-- Wrapper for print grid -->
@@ -2198,6 +2203,44 @@
                 )
                 .subscribe();
         }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./service-worker.js').catch((error) => {
+                    console.warn('Service worker registration failed:', error);
+                });
+            });
+        }
+
+        let deferredInstallPrompt = null;
+        const installButton = document.getElementById('install-app-btn');
+
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+            if (installButton) {
+                installButton.style.display = 'inline-flex';
+            }
+        });
+
+        if (installButton) {
+            installButton.addEventListener('click', async () => {
+                if (!deferredInstallPrompt) {
+                    return;
+                }
+                deferredInstallPrompt.prompt();
+                await deferredInstallPrompt.userChoice;
+                deferredInstallPrompt = null;
+                installButton.style.display = 'none';
+            });
+        }
+
+        window.addEventListener('appinstalled', () => {
+            deferredInstallPrompt = null;
+            if (installButton) {
+                installButton.style.display = 'none';
+            }
+        });
 
         // --- App Entry Point (DOM Ready) ---
         document.addEventListener('DOMContentLoaded', async () => {
