@@ -988,6 +988,11 @@
 
                 if (saveError) throw saveError;
                 console.log('Log entry saved (CNIC synced):', logEntry);
+
+                // Keep visible log list in sync even if realtime UPDATE is unavailable.
+                if (isLogVisible) {
+                    fetchLogs();
+                }
             } catch (e) {
                 console.error('Error adding document: ', e);
             }
@@ -2208,12 +2213,13 @@
             // FIXED: Do NOT fetch initial logs on load. Wait for "Show Log" button.
             // fetchLogs();
 
-            // 2. Listen for REALTIME inserts/deletes to refresh the list AND the count
+            // 2. Listen for REALTIME insert/update/delete to refresh the list and count.
+            // UPDATE is required because CNIC-based upsert usually updates existing rows.
             supabaseClient.channel('logs-channel')
                 .on(
                     'postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'logs' },
-                    (payload) => {
+                    () => {
                         // A new log was added, re-fetch the count always
                         fetchLogCount();
 
@@ -2225,8 +2231,18 @@
                 )
                 .on(
                     'postgres_changes',
+                    { event: 'UPDATE', schema: 'public', table: 'logs' },
+                    () => {
+                        // Existing log updated (e.g., pay fields), refresh visible list
+                        if (isLogVisible) {
+                            fetchLogs();
+                        }
+                    }
+                )
+                .on(
+                    'postgres_changes',
                     { event: 'DELETE', schema: 'public', table: 'logs' },
-                    (payload) => {
+                    () => {
                         // Logs were deleted (cleared), re-fetch the count always
                         fetchLogCount();
 
