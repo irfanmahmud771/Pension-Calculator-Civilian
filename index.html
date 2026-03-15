@@ -913,6 +913,7 @@
 
             const log_pensioner_name = pensionerNameInput.value;
             const log_cnic = cnicInput.value.trim();
+            const log_cnic_digits_only = log_cnic.replace(/\D/g, '');
             const log_dob_raw = dobInput.value;
             const log_doj_raw = dojInput.value;
             const log_sos_raw = sosInput.value;
@@ -987,22 +988,35 @@
                 // Fallback path for environments where unique index on cnic is not yet created.
                 // Prefer update+insert (upsert emulation) to avoid requiring DELETE permission.
                 if (saveError) {
-                    console.warn('Upsert failed, falling back to update+insert for CNIC:', saveError.message || saveError);
+                    console.warn('Upsert failed, falling back to select+update/insert for CNIC:', saveError.message || saveError);
 
-                    const { data: updatedRows, error: updateError } = await supabaseClient
-                        .from('logs')
-                        .update(logEntry)
-                        .eq('cnic', log_cnic)
-                        .select('id');
-
-                    if (updateError) {
-                        console.warn('Fallback update by CNIC failed:', updateError.message || updateError);
+                    const cnicVariants = [log_cnic];
+                    if (log_cnic_digits_only) {
+                        cnicVariants.push(log_cnic_digits_only);
                     }
 
-                    const hasUpdatedExistingRow = Array.isArray(updatedRows) && updatedRows.length > 0;
+                    const { data: existingRows, error: existingRowError } = await supabaseClient
+                        .from('logs')
+                        .select('id')
+                        .in('cnic', cnicVariants)
+                        .order('created_at', { ascending: false })
+                        .limit(1);
 
-                    if (hasUpdatedExistingRow) {
-                        saveError = null;
+                    if (existingRowError) {
+                        console.warn('Fallback lookup by CNIC failed:', existingRowError.message || existingRowError);
+                        saveError = existingRowError;
+                    } else if (Array.isArray(existingRows) && existingRows.length > 0) {
+                        const existingRowId = existingRows[0].id;
+                        const { error: updateError } = await supabaseClient
+                            .from('logs')
+                            .update(logEntry)
+                            .eq('id', existingRowId);
+
+                        saveError = updateError;
+
+                        if (updateError) {
+                            console.warn('Fallback update by existing row id failed:', updateError.message || updateError);
+                        }
                     } else {
                         const { error: insertError } = await supabaseClient
                             .from('logs')
