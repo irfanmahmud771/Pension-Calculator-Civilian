@@ -671,7 +671,9 @@
 
         // Supabase logging timer (kept small to avoid rapid duplicate writes)
         let logDebounceTimer = null;
-        const LOG_DEBOUNCE_DELAY = 300;
+        let logRetryTimer = null;
+        const LOG_DEBOUNCE_DELAY = 1500;
+        const LOG_RETRY_DELAY = 4000;
 
         // NEW: Store calculated values for logging
         let currentCalculatedValues = {
@@ -892,7 +894,7 @@
         }
 
         // --- Supabase Log Function (with duplicate checking) ---
-        async function logCalculation(triggerSource) {
+        async function logCalculation(triggerSource, attempt = 0) {
             if (!isSupabaseEnabled) return;
 
             const pensionerNameInput = document.getElementById('pensioner-name');
@@ -1012,12 +1014,25 @@
                 if (saveError) throw saveError;
                 console.log('Log entry saved (CNIC synced):', logEntry);
 
+                if (logRetryTimer) {
+                    clearTimeout(logRetryTimer);
+                    logRetryTimer = null;
+                }
+
                 // Keep visible log list in sync even if realtime UPDATE is unavailable.
                 if (isLogVisible) {
                     fetchLogs();
                 }
             } catch (e) {
-                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic });
+                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic, attempt });
+
+                // Retry transient failures so logging does not silently stop after temporary outages/rate limits.
+                if (attempt < 3) {
+                    if (logRetryTimer) clearTimeout(logRetryTimer);
+                    logRetryTimer = setTimeout(() => {
+                        logCalculation(triggerSource + ' (Retry)', attempt + 1);
+                    }, LOG_RETRY_DELAY);
+                }
             }
         }
 
@@ -1869,6 +1884,7 @@
 
                 // Clear log timer
                  if (logDebounceTimer) { clearTimeout(logDebounceTimer); logDebounceTimer = null; }
+                 if (logRetryTimer) { clearTimeout(logRetryTimer); logRetryTimer = null; }
                 return;
             }
 
