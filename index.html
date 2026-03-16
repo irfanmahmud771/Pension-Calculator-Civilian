@@ -974,10 +974,40 @@
             };
 
             try {
-                // Directly persist to Supabase only.
-                const { error: saveError } = await supabaseClient
+                // Persist directly to Supabase.
+                // Primary path: upsert by CNIC when a unique constraint exists.
+                let saveError = null;
+                const { error: upsertError } = await supabaseClient
                     .from('logs')
                     .upsert(logEntry, { onConflict: 'cnic' });
+
+                saveError = upsertError;
+
+                // If DB does not have a unique index on CNIC, fallback to update-or-insert in Supabase.
+                if (saveError) {
+                    const cnicVariants = [log_cnic];
+                    if (log_cnic_digits_only) {
+                        cnicVariants.push(log_cnic_digits_only);
+                    }
+
+                    const { data: updateRows, error: updateError } = await supabaseClient
+                        .from('logs')
+                        .update(logEntry)
+                        .in('cnic', cnicVariants)
+                        .select('id')
+                        .limit(1);
+
+                    if (updateError) {
+                        saveError = updateError;
+                    } else if (Array.isArray(updateRows) && updateRows.length > 0) {
+                        saveError = null;
+                    } else {
+                        const { error: insertError } = await supabaseClient
+                            .from('logs')
+                            .insert(logEntry);
+                        saveError = insertError;
+                    }
+                }
 
                 if (saveError) throw saveError;
                 console.log('Log entry saved (CNIC synced):', logEntry);
