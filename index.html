@@ -669,11 +669,11 @@
         let currentPasswordAction = null; // 'SHOW' or 'CLEAR' or 'DELETE_SINGLE'
         let logIdToDelete = null; // Store ID for single deletion
 
-        // Debounce timer for logging
+        // Supabase logging timer (kept small to avoid rapid duplicate writes)
         let logDebounceTimer = null;
-        // Debounced Supabase sync + calculation log update delay: 5 seconds
-        const LOG_DEBOUNCE_DELAY_SECONDS = 5;
-        const LOG_DEBOUNCE_DELAY = LOG_DEBOUNCE_DELAY_SECONDS * 1000;
+        let logRetryTimer = null;
+        const LOG_DEBOUNCE_DELAY = 1500;
+        const LOG_RETRY_DELAY = 4000;
 
         // NEW: Store calculated values for logging
         let currentCalculatedValues = {
@@ -894,7 +894,7 @@
         }
 
         // --- Supabase Log Function (with duplicate checking) ---
-        async function logCalculation(triggerSource) {
+        async function logCalculation(triggerSource, attempt = 0) {
             if (!isSupabaseEnabled) return;
 
             const pensionerNameInput = document.getElementById('pensioner-name');
@@ -976,8 +976,8 @@
             };
 
             try {
-                // Preferred path: rely on DB-level unique/primary key on `cnic`.
-                // If `cnic` is unique in Supabase, this updates existing rows automatically.
+                // Persist directly to Supabase.
+                // Primary path: upsert by CNIC when a unique constraint exists.
                 let saveError = null;
                 const { error: upsertError } = await supabaseClient
                     .from('logs')
@@ -985,43 +985,28 @@
 
                 saveError = upsertError;
 
-                // Fallback path for environments where unique index on cnic is not yet created.
-                // Prefer update+insert (upsert emulation) to avoid requiring DELETE permission.
+                // If DB does not have a unique index on CNIC, fallback to update-or-insert in Supabase.
                 if (saveError) {
-                    console.warn('Upsert failed, falling back to select+update/insert for CNIC:', saveError.message || saveError);
-
                     const cnicVariants = [log_cnic];
                     if (log_cnic_digits_only) {
                         cnicVariants.push(log_cnic_digits_only);
                     }
 
-                    const { data: existingRows, error: existingRowError } = await supabaseClient
+                    const { data: updateRows, error: updateError } = await supabaseClient
                         .from('logs')
-                        .select('id')
+                        .update(logEntry)
                         .in('cnic', cnicVariants)
-                        .order('created_at', { ascending: false })
+                        .select('id')
                         .limit(1);
 
-                    if (existingRowError) {
-                        console.warn('Fallback lookup by CNIC failed:', existingRowError.message || existingRowError);
-                        saveError = existingRowError;
-                    } else if (Array.isArray(existingRows) && existingRows.length > 0) {
-                        const existingRowId = existingRows[0].id;
-                        const { error: updateError } = await supabaseClient
-                            .from('logs')
-                            .update(logEntry)
-                            .eq('id', existingRowId);
-
+                    if (updateError) {
                         saveError = updateError;
-
-                        if (updateError) {
-                            console.warn('Fallback update by existing row id failed:', updateError.message || updateError);
-                        }
+                    } else if (Array.isArray(updateRows) && updateRows.length > 0) {
+                        saveError = null;
                     } else {
                         const { error: insertError } = await supabaseClient
                             .from('logs')
                             .insert(logEntry);
-
                         saveError = insertError;
                     }
                 }
@@ -1029,19 +1014,30 @@
                 if (saveError) throw saveError;
                 console.log('Log entry saved (CNIC synced):', logEntry);
 
+                if (logRetryTimer) {
+                    clearTimeout(logRetryTimer);
+                    logRetryTimer = null;
+                }
+
                 // Keep visible log list in sync even if realtime UPDATE is unavailable.
                 if (isLogVisible) {
                     fetchLogs();
                 }
             } catch (e) {
-                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic });
+                console.error('Error saving log entry to Supabase:', e, { triggerSource, cnic: log_cnic, attempt });
+
+                // Retry transient failures so logging does not silently stop after temporary outages/rate limits.
+                if (attempt < 3) {
+                    if (logRetryTimer) clearTimeout(logRetryTimer);
+                    logRetryTimer = setTimeout(() => {
+                        logCalculation(triggerSource + ' (Retry)', attempt + 1);
+                    }, LOG_RETRY_DELAY);
+                }
             }
         }
 
         function scheduleLogCalculation(triggerSource) {
             if (!isSupabaseEnabled) return;
-
-            clearTimeout(logDebounceTimer);
 
             const cnicInput = document.getElementById('cnic');
             const cnicPattern = /^\d{5}-\d{7}-\d$/;
@@ -1050,6 +1046,7 @@
             // Additional required-field checks are intentionally avoided so updates
             // are not skipped when a user edits/clears a single field.
             if (cnicInput && cnicPattern.test(cnicInput.value.trim())) {
+                clearTimeout(logDebounceTimer);
                 logDebounceTimer = setTimeout(() => {
                     logCalculation(triggerSource);
                 }, LOG_DEBOUNCE_DELAY);
@@ -1276,12 +1273,7 @@
             calculateAndDisplayAll();
 
             if (isSupabaseEnabled) {
-                clearTimeout(logDebounceTimer);
-                if (cnicInput.value.length === 15 && dobInput.value && dojInput.value && sosInput.value && grossPensionInput.value) {
-                    logDebounceTimer = setTimeout(() => {
-                        logCalculation('Load Log Data (Debounced)');
-                    }, LOG_DEBOUNCE_DELAY);
-                }
+                scheduleLogCalculation('Load Log Data (Debounced)');
             }
         }
 
@@ -1892,6 +1884,7 @@
 
                 // Clear log timer
                  if (logDebounceTimer) { clearTimeout(logDebounceTimer); logDebounceTimer = null; }
+                 if (logRetryTimer) { clearTimeout(logRetryTimer); logRetryTimer = null; }
                 return;
             }
 
