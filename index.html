@@ -1082,8 +1082,9 @@
         }
 
         function rowMatchesProtectedAction(row, action) {
+            const normalizedAction = normalizeSecretValue(action).toLowerCase();
             const actionHints = new Set([
-                normalizeSecretValue(action).toLowerCase(),
+                normalizedAction,
                 'show',
                 'show_log',
                 'show-log',
@@ -1092,7 +1093,12 @@
                 'log_password',
                 'show_log_password',
                 'calculation_log',
-                'calculation_log_password'
+                'calculation_log_password',
+                'admin',
+                'admin_password',
+                'password',
+                'app_password',
+                'global_password'
             ].filter(Boolean));
 
             const rowActionCandidates = [
