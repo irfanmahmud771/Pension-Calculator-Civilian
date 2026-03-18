@@ -1090,7 +1090,9 @@
                 row?.secret,
                 row?.secret_value,
                 row?.value,
-                row?.passcode
+                row?.passcode,
+                row?.text,
+                row?.content
             ].map(normalizeSecretValue).filter(Boolean);
 
             return passwordCandidates.includes(normalizedPassword);
@@ -1100,7 +1102,8 @@
             const { data, error } = await supabaseClient
                 .from(APP_SECRETS_TABLE)
                 .select('*')
-                .limit(25);
+                .or('key.eq.admin_password,name.eq.admin_password,text.eq.admin_password')
+                .limit(10);
 
             if (error) {
                 throw error;
