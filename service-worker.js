@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pension-civilan-v2';
+const CACHE_NAME = 'pension-civilan-v3';
 const APP_SHELL = [
   './',
   './index.html',
@@ -16,6 +16,12 @@ const isAppShellAsset = (url) => {
 };
 
 const isSupabaseRequest = (url) => url.hostname.endsWith('supabase.co');
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -50,17 +56,22 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Cache-first for static app shell so calculator keeps working offline.
+  // Network-first for app shell so installed clients pick up the latest version whenever they open online.
   if (isAppShellAsset(requestUrl)) {
     event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+      fetch(request, { cache: 'no-store' })
+        .then((response) => {
+          if (response && response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+          }
           return response;
-        });
-      })
+        })
+        .catch(async () => {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+          return caches.match('./index.html');
+        })
     );
     return;
   }

@@ -2343,10 +2343,54 @@
         }
 
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./service-worker.js').catch((error) => {
-                    console.warn('Service worker registration failed:', error);
+            let isReloadingForServiceWorker = false;
+
+            const reloadForServiceWorkerUpdate = () => {
+                if (isReloadingForServiceWorker) return;
+                isReloadingForServiceWorker = true;
+                window.location.reload();
+            };
+
+            const attachServiceWorkerUpdateHandlers = (registration) => {
+                if (!registration) return;
+
+                if (registration.waiting) {
+                    registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+                }
+
+                registration.addEventListener('updatefound', () => {
+                    const newWorker = registration.installing;
+                    if (!newWorker) return;
+
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            reloadForServiceWorkerUpdate();
+                        }
+                    });
                 });
+            };
+
+            navigator.serviceWorker.addEventListener('controllerchange', reloadForServiceWorkerUpdate);
+
+            window.addEventListener('load', async () => {
+                try {
+                    const registration = await navigator.serviceWorker.register('./service-worker.js');
+                    attachServiceWorkerUpdateHandlers(registration);
+                    await registration.update();
+                } catch (error) {
+                    console.warn('Service worker registration failed:', error);
+                }
+            });
+
+            document.addEventListener('visibilitychange', async () => {
+                if (document.visibilityState !== 'visible') return;
+                const registration = await navigator.serviceWorker.getRegistration();
+                if (registration) {
+                    attachServiceWorkerUpdateHandlers(registration);
+                    registration.update().catch((error) => {
+                        console.warn('Service worker update check failed:', error);
+                    });
+                }
             });
         }
 
