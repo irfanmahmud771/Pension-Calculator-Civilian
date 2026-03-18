@@ -659,7 +659,7 @@
         // --- App State Variables ---
         let supabaseClient;
         let isSupabaseEnabled = false;
-        const LOG_ACCESS_PASSWORD_RPC = 'verify_log_access_password';
+        const LOG_ACCESS_SECRETS_TABLE = 'app_secrets';
 
         // NEW: State for Log Visibility and Password Action
         let isLogVisible = false;
@@ -1077,31 +1077,67 @@
             logIdToDelete = null;
         }
 
+        function normalizeSecretValue(value) {
+            return typeof value === 'string' ? value.trim() : '';
+        }
+
+        function rowMatchesProtectedAction(row, action) {
+            const actionHints = new Set([
+                normalizeSecretValue(action).toLowerCase(),
+                'show',
+                'show_log',
+                'show-log',
+                'log',
+                'logs',
+                'log_password',
+                'show_log_password',
+                'calculation_log',
+                'calculation_log_password'
+            ].filter(Boolean));
+
+            const rowActionCandidates = [
+                row?.action,
+                row?.action_name,
+                row?.name,
+                row?.key,
+                row?.secret_key,
+                row?.secret_name,
+                row?.type
+            ].map(value => normalizeSecretValue(value).toLowerCase()).filter(Boolean);
+
+            if (!rowActionCandidates.length) {
+                return true;
+            }
+
+            return rowActionCandidates.some(value => actionHints.has(value));
+        }
+
+        function rowContainsPassword(row, password) {
+            const normalizedPassword = normalizeSecretValue(password);
+            if (!normalizedPassword) return false;
+
+            const passwordCandidates = [
+                row?.password,
+                row?.secret,
+                row?.secret_value,
+                row?.value,
+                row?.passcode
+            ].map(normalizeSecretValue).filter(Boolean);
+
+            return passwordCandidates.includes(normalizedPassword);
+        }
+
         async function validatePasswordWithSupabase(password, action) {
-            const { data, error } = await supabaseClient.rpc(LOG_ACCESS_PASSWORD_RPC, {
-                password_input: password,
-                action_name: action
-            });
+            const { data, error } = await supabaseClient
+                .from(LOG_ACCESS_SECRETS_TABLE)
+                .select('*')
+                .limit(25);
 
             if (error) {
                 throw error;
             }
 
-            if (typeof data === 'boolean') {
-                return data;
-            }
-
-            if (data && typeof data === 'object') {
-                if (typeof data.is_valid === 'boolean') {
-                    return data.is_valid;
-                }
-
-                if (typeof data.valid === 'boolean') {
-                    return data.valid;
-                }
-            }
-
-            return false;
+            return (data || []).some(row => rowMatchesProtectedAction(row, action) && rowContainsPassword(row, password));
         }
 
         // --- Handle Password Confirmation for protected actions ---
@@ -1130,8 +1166,8 @@
                 }
             } catch (error) {
                 console.error('Supabase password validation failed:', error);
-                passwordError.textContent = error?.message?.includes(LOG_ACCESS_PASSWORD_RPC)
-                    ? 'Password validation is not configured in Supabase.'
+                passwordError.textContent = error?.message?.includes(LOG_ACCESS_SECRETS_TABLE)
+                    ? 'Unable to read the app_secrets password from Supabase.'
                     : 'Unable to verify password right now. Please try again.';
                 passwordError.style.display = 'block';
             }
