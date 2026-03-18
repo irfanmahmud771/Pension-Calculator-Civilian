@@ -610,10 +610,6 @@
                     <button id="show-log-btn" class="text-sm bg-green-500 hover:bg-green-600 text-white font-medium py-1 px-3 rounded-lg transition-colors">
                         Show Log
                     </button>
-                    <!-- Clear Log Button -->
-                    <button id="clear-log-btn" class="text-sm bg-red-500 hover:bg-red-600 text-white font-medium py-1 px-3 rounded-lg transition-colors">
-                        Clear Log
-                    </button>
                 </div>
             </div>
             <div id="log-container" class="h-48 overflow-y-auto bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs font-mono">
@@ -663,10 +659,11 @@
         // --- App State Variables ---
         let supabaseClient;
         let isSupabaseEnabled = false;
+        const APP_SECRETS_TABLE = 'app_secrets';
 
         // NEW: State for Log Visibility and Password Action
         let isLogVisible = false;
-        let currentPasswordAction = null; // 'SHOW' or 'CLEAR' or 'DELETE_SINGLE'
+        let currentPasswordAction = null; // 'SHOW' or 'DELETE_SINGLE'
         let logIdToDelete = null; // Store ID for single deletion
 
         // Supabase logging timer (kept small to avoid rapid duplicate writes)
@@ -1062,7 +1059,7 @@
 
         // --- NEW: Password Modal Functions Logic ---
         function openPasswordModal(action, id = null) {
-            currentPasswordAction = action; // 'SHOW', 'CLEAR', or 'DELETE_SINGLE'
+            currentPasswordAction = action; // 'SHOW' or 'DELETE_SINGLE'
             logIdToDelete = id; // Store ID for single deletion
             const passwordModal = document.getElementById('password-modal');
             const passwordInput = document.getElementById('password-input');
@@ -1080,7 +1077,39 @@
             logIdToDelete = null;
         }
 
-        // --- NEW: Handle Password Confirmation for both Show and Clear ---
+        function normalizeSecretValue(value) {
+            return typeof value === 'string' ? value.trim() : '';
+        }
+
+        function rowContainsPassword(row, password) {
+            const normalizedPassword = normalizeSecretValue(password);
+            if (!normalizedPassword) return false;
+
+            const passwordCandidates = [
+                row?.password,
+                row?.secret,
+                row?.secret_value,
+                row?.value,
+                row?.passcode
+            ].map(normalizeSecretValue).filter(Boolean);
+
+            return passwordCandidates.includes(normalizedPassword);
+        }
+
+        async function validatePasswordWithSupabase(password) {
+            const { data, error } = await supabaseClient
+                .from(APP_SECRETS_TABLE)
+                .select('*')
+                .limit(25);
+
+            if (error) {
+                throw error;
+            }
+
+            return (data || []).some(row => rowContainsPassword(row, password));
+        }
+
+        // --- Handle Password Confirmation for protected actions ---
         async function confirmPasswordAction() {
             if (!isSupabaseEnabled) return;
 
@@ -1088,19 +1117,27 @@
             const passwordError = document.getElementById('password-error');
             const password = passwordInput.value;
 
-            if (password === 'Smile@786') {
+            try {
+                const isPasswordValid = await validatePasswordWithSupabase(password);
+
+                if (!isPasswordValid) {
+                    passwordError.textContent = "Incorrect password. Please try again.";
+                    passwordError.style.display = 'block';
+                    return;
+                }
+
                 passwordError.style.display = 'none';
 
-                if (currentPasswordAction === 'CLEAR') {
-                    await executeClearLog();
-                } else if (currentPasswordAction === 'SHOW') {
+                if (currentPasswordAction === 'SHOW') {
                     executeShowLog();
                 } else if (currentPasswordAction === 'DELETE_SINGLE') {
                     await executeDeleteLogEntry();
                 }
-
-            } else {
-                passwordError.textContent = "Incorrect password. Please try again.";
+            } catch (error) {
+                console.error('Supabase password validation failed:', error);
+                passwordError.textContent = error?.message?.includes(APP_SECRETS_TABLE)
+                    ? 'Unable to read the app_secrets password from Supabase.'
+                    : 'Unable to verify password right now. Please try again.';
                 passwordError.style.display = 'block';
             }
         }
@@ -1120,34 +1157,7 @@
             closePasswordModal();
         }
 
-        // --- UPDATED: Execute Clear Log Logic ---
-        async function executeClearLog() {
-             try {
-                // FIX: Use .delete() with a filter instead of RPC
-                const { error } = await supabaseClient
-                    .from('logs')
-                    .delete()
-                    .neq('id', 0); // Deletes all rows where id is not 0 (i.e., all rows)
 
-                if (error) throw error;
-
-                // If logs are visible, fetch empty list to update UI
-                if (isLogVisible) {
-                    fetchLogs();
-                }
-                // Update count
-                fetchLogCount();
-
-                closePasswordModal();
-            } catch (e) {
-                console.error("Error clearing log: ", e);
-                const passwordError = document.getElementById('password-error');
-                passwordError.textContent = "Error clearing log. See console.";
-                passwordError.style.display = 'block';
-            }
-        }
-
-        // --- NEW: Execute Single Log Deletion ---
         async function executeDeleteLogEntry() {
              const id = logIdToDelete;
              if (!isSupabaseEnabled || !id) return;
@@ -2397,7 +2407,6 @@
             const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
             const dojInput = document.getElementById('doj');
             const sosInput = document.getElementById('sos');
-            const clearLogBtn = document.getElementById('clear-log-btn');
             const showLogBtn = document.getElementById('show-log-btn'); // NEW Button
             const cancelModalBtn = document.getElementById('cancel-modal-btn'); // Renamed ID
             const confirmModalBtn = document.getElementById('confirm-modal-btn'); // Renamed ID
@@ -2486,7 +2495,6 @@
             // Only attach these listeners if Supabase is on
             if (isSupabaseEnabled) {
                 // Correctly reference the elements by their current IDs
-                if(clearLogBtn) clearLogBtn.addEventListener('click', () => openPasswordModal('CLEAR'));
                 if(showLogBtn) showLogBtn.addEventListener('click', () => openPasswordModal('SHOW')); // New Listener
                 if(cancelModalBtn) cancelModalBtn.addEventListener('click', closePasswordModal);
                 if(confirmModalBtn) confirmModalBtn.addEventListener('click', confirmPasswordAction); // Updated handler
