@@ -659,6 +659,7 @@
         // --- App State Variables ---
         let supabaseClient;
         let isSupabaseEnabled = false;
+        const LOG_ACCESS_PASSWORD_RPC = 'verify_log_access_password';
 
         // NEW: State for Log Visibility and Password Action
         let isLogVisible = false;
@@ -1076,6 +1077,33 @@
             logIdToDelete = null;
         }
 
+        async function validatePasswordWithSupabase(password, action) {
+            const { data, error } = await supabaseClient.rpc(LOG_ACCESS_PASSWORD_RPC, {
+                password_input: password,
+                action_name: action
+            });
+
+            if (error) {
+                throw error;
+            }
+
+            if (typeof data === 'boolean') {
+                return data;
+            }
+
+            if (data && typeof data === 'object') {
+                if (typeof data.is_valid === 'boolean') {
+                    return data.is_valid;
+                }
+
+                if (typeof data.valid === 'boolean') {
+                    return data.valid;
+                }
+            }
+
+            return false;
+        }
+
         // --- Handle Password Confirmation for protected actions ---
         async function confirmPasswordAction() {
             if (!isSupabaseEnabled) return;
@@ -1084,7 +1112,15 @@
             const passwordError = document.getElementById('password-error');
             const password = passwordInput.value;
 
-            if (password === 'Smile@786') {
+            try {
+                const isPasswordValid = await validatePasswordWithSupabase(password, currentPasswordAction);
+
+                if (!isPasswordValid) {
+                    passwordError.textContent = "Incorrect password. Please try again.";
+                    passwordError.style.display = 'block';
+                    return;
+                }
+
                 passwordError.style.display = 'none';
 
                 if (currentPasswordAction === 'SHOW') {
@@ -1092,9 +1128,11 @@
                 } else if (currentPasswordAction === 'DELETE_SINGLE') {
                     await executeDeleteLogEntry();
                 }
-
-            } else {
-                passwordError.textContent = "Incorrect password. Please try again.";
+            } catch (error) {
+                console.error('Supabase password validation failed:', error);
+                passwordError.textContent = error?.message?.includes(LOG_ACCESS_PASSWORD_RPC)
+                    ? 'Password validation is not configured in Supabase.'
+                    : 'Unable to verify password right now. Please try again.';
                 passwordError.style.display = 'block';
             }
         }
