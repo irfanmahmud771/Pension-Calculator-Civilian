@@ -339,6 +339,7 @@
                                     Load Data
                                 </button>
                             </div>
+                            <div id="cnic-status-message" class="mt-1 whitespace-pre-line text-xs font-medium text-red-600" style="display: none;"></div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -695,6 +696,9 @@
         let currentPasswordAction = null; // 'SHOW' or 'DELETE_SINGLE'
         let logIdToDelete = null; // Store ID for single deletion
         let pendingCnicRecord = null;
+        let existingCnicRecord = null;
+        let verifiedCnicValue = '';
+        let cnicLookupTimer = null;
 
         // Supabase logging timer (kept small to avoid rapid duplicate writes)
         let logDebounceTimer = null;
@@ -1233,6 +1237,75 @@
             return formatted;
         }
 
+        function setCnicStatusMessage(message = '') {
+            const statusMessage = document.getElementById('cnic-status-message');
+            if (!statusMessage) return;
+
+            statusMessage.textContent = message;
+            statusMessage.style.display = message ? 'block' : 'none';
+        }
+
+        function isExistingCnicBlocked(cnicValue) {
+            return Boolean(
+                existingCnicRecord &&
+                normalizeCnic(existingCnicRecord.cnic || '') === cnicValue &&
+                verifiedCnicValue !== cnicValue
+            );
+        }
+
+        async function fetchLatestLogByCnic(cnicValue) {
+            const cnicVariants = [cnicValue, cnicValue.replace(/\D/g, '')];
+            const { data, error } = await supabaseClient
+                .from('logs')
+                .select('*')
+                .in('cnic', cnicVariants)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) throw error;
+            return data || null;
+        }
+
+        async function checkExistingCnicRecord(cnicValue) {
+            const normalizedCnic = normalizeCnic(cnicValue);
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+
+            if (!cnicPattern.test(normalizedCnic) || !isSupabaseEnabled) {
+                existingCnicRecord = null;
+                if (verifiedCnicValue !== normalizedCnic) {
+                    verifiedCnicValue = '';
+                }
+                setCnicStatusMessage('');
+                checkInputEnabling();
+                return;
+            }
+
+            try {
+                const data = await fetchLatestLogByCnic(normalizedCnic);
+                const currentCnicValue = normalizeCnic(document.getElementById('cnic')?.value || '');
+                if (currentCnicValue !== normalizedCnic) return;
+
+                existingCnicRecord = data;
+                if (!data) {
+                    verifiedCnicValue = '';
+                    setCnicStatusMessage('');
+                } else if (verifiedCnicValue !== normalizedCnic) {
+                    setCnicStatusMessage('Attention\nCNIC already exists. Use "Load Data" button or enter New.');
+                }
+
+                checkInputEnabling();
+            } catch (error) {
+                console.error('Error checking existing CNIC:', error);
+                existingCnicRecord = null;
+                verifiedCnicValue = '';
+                setCnicStatusMessage('');
+                checkInputEnabling();
+            }
+            if (dobInput) dobInput.value = '';
+            if (modal) modal.classList.add('visible');
+        }
+
         function closeCnicVerifyModal() {
             const modal = document.getElementById('cnic-verify-modal');
             const dobInput = document.getElementById('verify-dob-input');
@@ -1276,6 +1349,9 @@
 
             pensionerNameInput.value = data.pensioner_name || data.name || '';
             cnicInput.value = normalizeCnic(data.cnic || '');
+            verifiedCnicValue = cnicInput.value;
+            existingCnicRecord = data;
+            setCnicStatusMessage('');
             dobInput.value = data.dob_raw || data.dob || '';
             dojInput.value = data.doj_raw || data.doj || '';
             sosInput.value = data.sos_raw || data.sos || '';
@@ -1360,16 +1436,7 @@
             }
 
             try {
-                const cnicVariants = [enteredCnic, enteredCnic.replace(/\D/g, '')];
-                const { data, error } = await supabaseClient
-                    .from('logs')
-                    .select('*')
-                    .in('cnic', cnicVariants)
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .maybeSingle();
-
-                if (error) throw error;
+                const data = await fetchLatestLogByCnic(enteredCnic);
 
                 if (!data) {
                     window.alert('No existing data found for this CNIC.');
@@ -1403,6 +1470,8 @@
                 return;
             }
 
+            verifiedCnicValue = normalizeCnic(pendingCnicRecord.cnic || '');
+            setCnicStatusMessage('');
             applyLogDataToForm(pendingCnicRecord);
             closeCnicVerifyModal();
         }
@@ -2245,7 +2314,7 @@
             cnicInput.disabled = false;
 
             const cnicFilled = cnicInput.value.length === 15;
-            dobInput.disabled = !cnicFilled;
+            dobInput.disabled = !cnicFilled || isExistingCnicBlocked(cnicInput.value);
 
             // Enable DOJ only after DOB has been entered
             const dobFilled = dobInput.value !== '';
@@ -2657,6 +2726,22 @@
             if (cnicInput) {
                 addInputAndChangeListeners(cnicInput, (e) => {
                     e.target.value = normalizeCnic(e.target.value);
+                    const normalizedCnic = e.target.value;
+
+                    if (verifiedCnicValue && verifiedCnicValue !== normalizedCnic) {
+                        verifiedCnicValue = '';
+                    }
+
+                    if (!normalizedCnic || !isExistingCnicBlocked(normalizedCnic)) {
+                        setCnicStatusMessage('');
+                    }
+
+                    if (cnicLookupTimer) {
+                        clearTimeout(cnicLookupTimer);
+                    }
+                    cnicLookupTimer = setTimeout(() => {
+                        checkExistingCnicRecord(normalizedCnic);
+                    }, 400);
 
                     checkInputEnabling();
                     calculateAndDisplayAll();
