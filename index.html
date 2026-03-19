@@ -960,7 +960,9 @@
             if (!cnicPattern.test(log_cnic)) return;
 
             if (hasKnownExistingCnic(log_cnic)) {
-                setCnicStatusMessage('Error\nCNIC already exists, Use "Load Data" button or enter New.');
+                if (verifiedCnicValue !== log_cnic) {
+                    setCnicStatusMessage('Error\nCNIC already exists, Use "Load Data" button or enter New.');
+                }
                 return;
             }
 
@@ -1291,6 +1293,28 @@
                 setCnicStatusMessage('');
                 checkInputEnabling();
                 return;
+            }
+
+            try {
+                const data = await fetchLatestLogByCnic(normalizedCnic);
+                const currentCnicValue = normalizeCnic(document.getElementById('cnic')?.value || '');
+                if (currentCnicValue !== normalizedCnic) return;
+
+                existingCnicRecord = data;
+                if (!data) {
+                    verifiedCnicValue = '';
+                    setCnicStatusMessage('');
+                } else if (verifiedCnicValue !== normalizedCnic) {
+                    setCnicStatusMessage('Error\nCNIC already exists, Use "Load Data" button or enter New.');
+                }
+
+                checkInputEnabling();
+            } catch (error) {
+                console.error('Error checking existing CNIC:', error);
+                existingCnicRecord = null;
+                verifiedCnicValue = '';
+                setCnicStatusMessage('');
+                checkInputEnabling();
             }
 
             try {
