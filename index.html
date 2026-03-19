@@ -333,7 +333,13 @@
 
                         <div class="input-group">
                             <label for="cnic">CNIC</label>
-                            <input type="text" id="cnic" class="calc-input" placeholder="00000-0000000-0" maxlength="15" disabled>
+                            <div class="flex gap-2 items-center">
+                                <input type="text" id="cnic" class="calc-input flex-1" placeholder="00000-0000000-0" maxlength="15">
+                                <button id="load-cnic-data-btn" type="button" class="inline-flex items-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300">
+                                    Load Data
+                                </button>
+                            </div>
+                            <div id="cnic-status-message" class="mt-1 whitespace-pre-line text-xs font-medium text-red-600" style="display: none;"></div>
                         </div>
 
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
@@ -642,6 +648,26 @@
             </div>
         </div>
     </div>
+    <!-- CNIC Verification Modal -->
+    <div id="cnic-verify-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold mb-2">CNIC Already Exist Enter Date of Birth</h3>
+            <p class="text-sm text-gray-600 mb-4">Enter the saved date of birth to verify and load data from database.</p>
+            <div class="input-group">
+                <label for="verify-dob-input">Date of Birth</label>
+                <input type="date" id="verify-dob-input" class="w-full">
+            </div>
+            <p id="verify-dob-error" class="text-red-500 text-sm mb-4" style="display: none;"></p>
+            <div class="flex justify-end gap-3">
+                <button id="cancel-verify-btn" type="button" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors">
+                    Cancel
+                </button>
+                <button id="confirm-verify-btn" type="button" class="text-sm bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                    Verify
+                </button>
+            </div>
+        </div>
+    </div>
     <!-- End Modal -->
 
 
@@ -669,6 +695,10 @@
         let isLogVisible = false;
         let currentPasswordAction = null; // 'SHOW' or 'DELETE_SINGLE'
         let logIdToDelete = null; // Store ID for single deletion
+        let pendingCnicRecord = null;
+        let existingCnicRecord = null;
+        let verifiedCnicValue = '';
+        let cnicLookupTimer = null;
 
         // Supabase logging timer (kept small to avoid rapid duplicate writes)
         let logDebounceTimer = null;
@@ -928,6 +958,11 @@
             // CNIC format must be complete before logging/saving
             const cnicPattern = /^\d{5}-\d{7}-\d$/;
             if (!cnicPattern.test(log_cnic)) return;
+
+            if (hasKnownExistingCnic(log_cnic)) {
+                setCnicStatusMessage('Error\nCNIC already exists, Use "Load Data" button or enter New.');
+                return;
+            }
 
             // Determine family status for logging (incorporate In Service Death)
             let log_family = familyPensionInput.value;
@@ -1198,6 +1233,259 @@
             closePasswordModal();
         }
 
+        function normalizeCnic(cnic = '') {
+            const digitsOnly = cnic.replace(/\D/g, '').slice(0, 13);
+            let formatted = '';
+            if (digitsOnly.length > 0) formatted += digitsOnly.slice(0, 5);
+            if (digitsOnly.length > 5) formatted += '-' + digitsOnly.slice(5, 12);
+            if (digitsOnly.length > 12) formatted += '-' + digitsOnly.slice(12, 13);
+            return formatted;
+        }
+
+        function setCnicStatusMessage(message = '') {
+            const statusMessage = document.getElementById('cnic-status-message');
+            if (!statusMessage) return;
+
+            statusMessage.textContent = message;
+            statusMessage.style.display = message ? 'block' : 'none';
+        }
+
+        function isExistingCnicBlocked(cnicValue) {
+            return Boolean(
+                existingCnicRecord &&
+                normalizeCnic(existingCnicRecord.cnic || '') === cnicValue &&
+                verifiedCnicValue !== cnicValue
+            );
+        }
+
+        function hasKnownExistingCnic(cnicValue) {
+            return Boolean(
+                existingCnicRecord &&
+                normalizeCnic(existingCnicRecord.cnic || '') === cnicValue
+            );
+        }
+
+        async function fetchLatestLogByCnic(cnicValue) {
+            const cnicVariants = [cnicValue, cnicValue.replace(/\D/g, '')];
+            const { data, error } = await supabaseClient
+                .from('logs')
+                .select('*')
+                .in('cnic', cnicVariants)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+
+            if (error) throw error;
+            return data || null;
+        }
+
+        async function checkExistingCnicRecord(cnicValue) {
+            const normalizedCnic = normalizeCnic(cnicValue);
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+
+            if (!cnicPattern.test(normalizedCnic) || !isSupabaseEnabled) {
+                existingCnicRecord = null;
+                if (verifiedCnicValue !== normalizedCnic) {
+                    verifiedCnicValue = '';
+                }
+                setCnicStatusMessage('');
+                checkInputEnabling();
+                return;
+            }
+
+            try {
+                const data = await fetchLatestLogByCnic(normalizedCnic);
+                const currentCnicValue = normalizeCnic(document.getElementById('cnic')?.value || '');
+                if (currentCnicValue !== normalizedCnic) return;
+
+                existingCnicRecord = data;
+                if (!data) {
+                    verifiedCnicValue = '';
+                    setCnicStatusMessage('');
+                } else if (verifiedCnicValue !== normalizedCnic) {
+                    setCnicStatusMessage('Error\nCNIC already exists, Use "Load Data" button or enter New.');
+                }
+
+                checkInputEnabling();
+            } catch (error) {
+                console.error('Error checking existing CNIC:', error);
+                existingCnicRecord = null;
+                verifiedCnicValue = '';
+                setCnicStatusMessage('');
+                checkInputEnabling();
+            }
+        }
+
+        function closeCnicVerifyModal() {
+            const modal = document.getElementById('cnic-verify-modal');
+            const dobInput = document.getElementById('verify-dob-input');
+            const error = document.getElementById('verify-dob-error');
+
+            if (modal) modal.classList.remove('visible');
+            if (dobInput) dobInput.value = '';
+            if (error) {
+                error.textContent = '';
+                error.style.display = 'none';
+            }
+
+            pendingCnicRecord = null;
+        }
+
+        function openCnicVerifyModal(record) {
+            pendingCnicRecord = record;
+
+            const modal = document.getElementById('cnic-verify-modal');
+            const error = document.getElementById('verify-dob-error');
+            const dobInput = document.getElementById('verify-dob-input');
+
+            if (error) {
+                error.textContent = '';
+                error.style.display = 'none';
+            }
+            if (dobInput) dobInput.value = '';
+            if (modal) modal.classList.add('visible');
+        }
+
+        function applyLogDataToForm(data) {
+            const pensionerNameInput = document.getElementById('pensioner-name');
+            const cnicInput = document.getElementById('cnic');
+            const dobInput = document.getElementById('dob');
+            const dojInput = document.getElementById('doj');
+            const sosInput = document.getElementById('sos');
+            const bpsInput = document.getElementById('bps');
+            const grossPensionInput = document.getElementById('gross-pension-ppo');
+            const familyPensionInput = document.getElementById('family-pension');
+            const inServiceDeathInput = document.getElementById('in-service-death');
+
+            pensionerNameInput.value = data.pensioner_name || data.name || '';
+            cnicInput.value = normalizeCnic(data.cnic || '');
+            verifiedCnicValue = cnicInput.value;
+            existingCnicRecord = data;
+            setCnicStatusMessage('');
+            dobInput.value = data.dob_raw || data.dob || '';
+            dojInput.value = data.doj_raw || data.doj || '';
+            sosInput.value = data.sos_raw || data.sos || '';
+            bpsInput.value = data.bps || '';
+
+            const pensionValue = (data.pension_raw || data.pension || '').toString();
+            const basicPayFromLog = parseFloat((data.basic_pay || data.basicPay || '').toString().replace(/,/g, '')) || 0;
+            const shouldRecalculateGrossPension = basicPayFromLog > 0;
+
+            if (!shouldRecalculateGrossPension) {
+                const parts = pensionValue.split('.');
+                let integerPart = (parts[0] || '').replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                const decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
+
+                grossPensionInput.value = integerPart;
+                if (decimalPart) grossPensionInput.value += '.' + decimalPart;
+                if (parseFloat(pensionValue) === 0) grossPensionInput.value = '0';
+            } else {
+                grossPensionInput.value = '';
+            }
+
+            let familyVal = data.family || 'No';
+            let inServiceDeathVal = 'No';
+            if (familyVal.includes('In-Service Death')) {
+                familyVal = 'Yes';
+                inServiceDeathVal = 'Yes';
+            }
+            familyPensionInput.value = familyVal;
+
+            const linkCheckbox = document.getElementById('link-gross-pension');
+            const payFieldMap = {
+                'basic-pay': data.basic_pay || data.basicPay,
+                'personnel-pay': data.personnel_pay || data.personnelPay,
+                'qualification-pay': data.qualification_pay || data.qualificationPay,
+                'other-pay': data.other_pay || data.otherPay
+            };
+
+            const parsedPayValues = Object.values(payFieldMap)
+                .map((value) => parseFloat((value || '').toString().replace(/,/g, '')) || 0);
+            const hasPayEmolumentsData = parsedPayValues.some((value) => value > 0);
+
+            Object.entries(payFieldMap).forEach(([id, value]) => {
+                const input = document.getElementById(id);
+                const numericValue = parseFloat((value || '').toString().replace(/,/g, ''));
+                input.value = Number.isFinite(numericValue) && numericValue > 0
+                    ? formatCurrency(numericValue, false).replace('Rs. ', '')
+                    : '';
+            });
+
+            linkCheckbox.checked = shouldRecalculateGrossPension ? true : false;
+
+            if (!hasPayEmolumentsData) {
+                document.getElementById('total-pay').value = '';
+                document.getElementById('gross-pension-calc').value = '';
+                document.getElementById('months-before-superannuation').value = '';
+                document.getElementById('pension-penalty').value = '0';
+            }
+
+            checkInputEnabling();
+            if (inServiceDeathInput) inServiceDeathInput.value = inServiceDeathVal;
+            calculateAndDisplayAll();
+
+            if (isSupabaseEnabled) {
+                scheduleLogCalculation('Load Log Data (Debounced)');
+            }
+        }
+
+        async function handleLoadCnicData() {
+            if (!isSupabaseEnabled) {
+                window.alert('Online database is not available right now.');
+                return;
+            }
+
+            const cnicInput = document.getElementById('cnic');
+            const enteredCnic = normalizeCnic(cnicInput.value || '');
+            const cnicPattern = /^\d{5}-\d{7}-\d$/;
+
+            if (!cnicPattern.test(enteredCnic)) {
+                window.alert('Please enter a valid CNIC first.');
+                cnicInput.focus();
+                return;
+            }
+
+            try {
+                const data = await fetchLatestLogByCnic(enteredCnic);
+
+                if (!data) {
+                    window.alert('No existing data found for this CNIC.');
+                    return;
+                }
+
+                openCnicVerifyModal(data);
+            } catch (error) {
+                console.error('Error loading CNIC data:', error);
+                window.alert('Unable to load CNIC data right now. Please try again.');
+            }
+        }
+
+        function verifyPendingCnicRecord() {
+            if (!pendingCnicRecord) return;
+
+            const dobInput = document.getElementById('verify-dob-input');
+            const error = document.getElementById('verify-dob-error');
+            const enteredDob = dobInput.value;
+            const savedDob = pendingCnicRecord.dob_raw || pendingCnicRecord.dob;
+
+            if (!enteredDob) {
+                error.textContent = 'Please enter Date of Birth.';
+                error.style.display = 'block';
+                return;
+            }
+
+            if (enteredDob !== savedDob) {
+                error.textContent = 'Date of Birth does not match our record.';
+                error.style.display = 'block';
+                return;
+            }
+
+            verifiedCnicValue = normalizeCnic(pendingCnicRecord.cnic || '');
+            setCnicStatusMessage('');
+            applyLogDataToForm(pendingCnicRecord);
+            closeCnicVerifyModal();
+        }
+
 
         async function executeDeleteLogEntry() {
              const id = logIdToDelete;
@@ -1227,105 +1515,7 @@
 
 
         function loadLogData(button) {
-            const data = button.dataset;
-
-            const pensionerNameInput = document.getElementById('pensioner-name');
-            const cnicInput = document.getElementById('cnic');
-            const dobInput = document.getElementById('dob');
-            const dojInput = document.getElementById('doj');
-            const sosInput = document.getElementById('sos');
-            const bpsInput = document.getElementById('bps'); // Added: BPS Input
-            const grossPensionInput = document.getElementById('gross-pension-ppo');
-            const familyPensionInput = document.getElementById('family-pension');
-            const inServiceDeathInput = document.getElementById('in-service-death');
-
-            pensionerNameInput.value = data.name || ''; // Load Name
-            cnicInput.value = data.cnic || ''; // Load CNIC
-            dobInput.value = data.dob || '';
-            dojInput.value = data.doj || '';
-            sosInput.value = data.sos || '';
-            bpsInput.value = data.bps || ''; // Added: BPS Value
-
-            const pensionValue = data.pension || '';
-            const basicPayFromLog = parseFloat((data.basicPay || '').toString().replace(/,/g, '')) || 0;
-            const shouldRecalculateGrossPension = basicPayFromLog > 0;
-
-            if (!shouldRecalculateGrossPension) {
-                grossPensionInput.value = pensionValue;
-
-                const parts = pensionValue.split('.');
-                let integerPart = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-                let decimalPart = parts[1] ? (parts[1] + '00').substring(0, 2) : '';
-
-                grossPensionInput.value = integerPart;
-                if (decimalPart) {
-                    grossPensionInput.value += '.' + decimalPart;
-                }
-                if (parseFloat(pensionValue) === 0) {
-                    grossPensionInput.value = '0';
-                }
-            } else {
-                // Basic Pay exists in log, so gross pension should be recalculated from pay components.
-                grossPensionInput.value = '';
-            }
-
-            // Parse Family & In Service Death from the stored 'family' string
-            let familyVal = data.family || 'No';
-            let inServiceDeathVal = 'No';
-
-            if (familyVal.includes('In-Service Death')) {
-                familyVal = 'Yes';
-                inServiceDeathVal = 'Yes';
-            }
-
-            familyPensionInput.value = familyVal;
-            // The checkInputEnabling call below will show the field, then we set the value
-
-            const linkCheckbox = document.getElementById('link-gross-pension');
-
-            const payFieldMap = {
-                'basic-pay': data.basicPay,
-                'personnel-pay': data.personnelPay,
-                'qualification-pay': data.qualificationPay,
-                'other-pay': data.otherPay
-            };
-
-            const parsedPayValues = Object.values(payFieldMap)
-                .map((value) => parseFloat((value || '').toString().replace(/,/g, '')) || 0);
-            const hasPayEmolumentsData = parsedPayValues.some((value) => value > 0);
-
-            Object.entries(payFieldMap).forEach(([id, value]) => {
-                const input = document.getElementById(id);
-                const numericValue = parseFloat((value || '').toString().replace(/,/g, ''));
-                input.value = Number.isFinite(numericValue) && numericValue > 0
-                    ? formatCurrency(numericValue, false).replace('Rs. ', '')
-                    : '';
-            });
-
-            // Required behavior:
-            // - If Basic Pay > 0, force Auto Link ON and recalculate Gross Pension from pay data.
-            // - If no pay emoluments data exists, keep Auto Link OFF and use gross pension from saved DB value.
-            linkCheckbox.checked = shouldRecalculateGrossPension ? true : false;
-
-            if (!hasPayEmolumentsData) {
-                document.getElementById('total-pay').value = '';
-                document.getElementById('gross-pension-calc').value = '';
-                document.getElementById('months-before-superannuation').value = '';
-                document.getElementById('pension-penalty').value = '0';
-            }
-
-            checkInputEnabling(); // Shows "In Service Death" field if family is Yes
-
-            // Set In Service Death value AFTER it's revealed
-            if (inServiceDeathInput) {
-                inServiceDeathInput.value = inServiceDeathVal;
-            }
-
-            calculateAndDisplayAll();
-
-            if (isSupabaseEnabled) {
-                scheduleLogCalculation('Load Log Data (Debounced)');
-            }
+            applyLogDataToForm(button.dataset);
         }
 
         // The stepper button functions are intentionally left as stubs
@@ -2129,12 +2319,12 @@
             const basicPayLabel = document.getElementById('basic-pay-label');
             const otherPayInput = document.getElementById('other-pay');
 
-            // Check if name is filled
+            // CNIC entry remains available even when Name is blank.
             const nameFilled = nameInput.value.trim() !== '';
-            cnicInput.disabled = !nameFilled;
+            cnicInput.disabled = false;
 
             const cnicFilled = cnicInput.value.length === 15;
-            dobInput.disabled = !cnicFilled;
+            dobInput.disabled = !cnicFilled || isExistingCnicBlocked(cnicInput.value);
 
             // Enable DOJ only after DOB has been entered
             const dobFilled = dobInput.value !== '';
@@ -2161,7 +2351,7 @@
             const bpsFilled = bpsInput.value !== '';
 
             // Enable gross pension and family pension if previous fields are filled
-            const coreInputsEnabled = nameFilled && dojFilled && sosFilled && bpsFilled;
+            const coreInputsEnabled = dojFilled && sosFilled && bpsFilled;
 
             familyPensionInput.disabled = !coreInputsEnabled;
 
@@ -2516,6 +2706,10 @@
             const confirmModalBtn = document.getElementById('confirm-modal-btn'); // Renamed ID
             const passwordInput = document.getElementById('password-input');
             const logContainer = document.getElementById('log-container');
+            const loadCnicDataBtn = document.getElementById('load-cnic-data-btn');
+            const cancelVerifyBtn = document.getElementById('cancel-verify-btn');
+            const confirmVerifyBtn = document.getElementById('confirm-verify-btn');
+            const verifyDobInput = document.getElementById('verify-dob-input');
 
             const pensionerNameInput = document.getElementById('pensioner-name'); // Name Input
             const cnicInput = document.getElementById('cnic'); // CNIC Input
@@ -2541,12 +2735,23 @@
 
             if (cnicInput) {
                 addInputAndChangeListeners(cnicInput, (e) => {
-                    const digitsOnly = e.target.value.replace(/\D/g, '').slice(0, 13);
-                    let formatted = '';
-                    if (digitsOnly.length > 0) formatted += digitsOnly.slice(0, 5);
-                    if (digitsOnly.length > 5) formatted += '-' + digitsOnly.slice(5, 12);
-                    if (digitsOnly.length > 12) formatted += '-' + digitsOnly.slice(12, 13);
-                    e.target.value = formatted;
+                    e.target.value = normalizeCnic(e.target.value);
+                    const normalizedCnic = e.target.value;
+
+                    if (verifiedCnicValue && verifiedCnicValue !== normalizedCnic) {
+                        verifiedCnicValue = '';
+                    }
+
+                    if (!normalizedCnic || !isExistingCnicBlocked(normalizedCnic)) {
+                        setCnicStatusMessage('');
+                    }
+
+                    if (cnicLookupTimer) {
+                        clearTimeout(cnicLookupTimer);
+                    }
+                    cnicLookupTimer = setTimeout(() => {
+                        checkExistingCnicRecord(normalizedCnic);
+                    }, 400);
 
                     checkInputEnabling();
                     calculateAndDisplayAll();
@@ -2594,6 +2799,19 @@
             // Add listener for penalty input (uses formatGrossPensionInput to handle currency formatting and recalculation)
             if (pensionPenaltyInput) {
                  addInputAndChangeListeners(pensionPenaltyInput, formatGrossPensionInput);
+            }
+
+            if(loadCnicDataBtn) loadCnicDataBtn.addEventListener('click', handleLoadCnicData);
+            if(cancelVerifyBtn) cancelVerifyBtn.addEventListener('click', closeCnicVerifyModal);
+            if(confirmVerifyBtn) confirmVerifyBtn.addEventListener('click', verifyPendingCnicRecord);
+            if(verifyDobInput) {
+                addInputAndChangeListeners(verifyDobInput, () => {
+                    const error = document.getElementById('verify-dob-error');
+                    if (error) {
+                        error.textContent = '';
+                        error.style.display = 'none';
+                    }
+                });
             }
 
             // Only attach these listeners if Supabase is on
