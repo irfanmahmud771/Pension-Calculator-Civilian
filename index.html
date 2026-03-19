@@ -551,6 +551,10 @@
                             <span class="label w-1/3 whitespace-nowrap">Age on Pension Restoration</span>
                             <span class="value text-gray-800 text-right" id="age-at-restoration-output">0 Years</span>
                         </div>
+                        <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Period Remaing in Restoration</span>
+                            <span class="value text-gray-800 text-right" id="period-remaining-restoration-output">0 Years</span>
+                        </div>
                      </div>
                 </div>
             </div>
@@ -1785,6 +1789,31 @@
             return { current: currentNetValues, restored: restoredNetValues, netByYearCurrent, netByYearRestored };
         }
 
+        function formatYearsMonthsFromDates(startDate, endDate) {
+            if (!startDate || !endDate || endDate < startDate) {
+                return 'N/A';
+            }
+
+            let totalMonths = (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12;
+            totalMonths -= startDate.getUTCMonth();
+            totalMonths += endDate.getUTCMonth();
+
+            if (endDate.getUTCDate() < startDate.getUTCDate()) {
+                totalMonths--;
+            }
+
+            if (totalMonths < 0) {
+                return 'N/A';
+            }
+
+            const years = Math.floor(totalMonths / 12);
+            const months = totalMonths % 12;
+            const yearsString = `${years} Years`;
+            const monthsString = months === 1 ? ', 1 Month' : months > 1 ? `, ${months} Months` : '';
+
+            return yearsString + monthsString;
+        }
+
         // NEW: Helper function to reset all output fields when calculation is skipped
         function resetOutputFields() {
             // Service Summary
@@ -1810,6 +1839,7 @@
             restorationOutputSpan.textContent = 'N/A';
             restorationOutputSpan.className = 'value text-gray-800';
             document.getElementById('age-at-restoration-output').textContent = '0 Years';
+            document.getElementById('period-remaining-restoration-output').textContent = '0 Years';
 
             // Clear increase table
             document.getElementById('increase-table-body').innerHTML = '';
@@ -1898,21 +1928,14 @@
                 restorationOutputSpan.className = 'value text-gray-800';
             }
 
-            let restorationAgeDisplay = 'N/A';
-            if (dobDate && restorationDate && restorationDate > dobDate) {
-                let totalMonths = (restorationDate.getUTCFullYear() - dobDate.getUTCFullYear()) * 12;
-                totalMonths -= dobDate.getUTCMonth();
-                totalMonths += restorationDate.getUTCMonth();
-                if (restorationDate.getUTCDate() < dobDate.getUTCDate()) {
-                    totalMonths--;
-                }
-                const restorationAgeYears = Math.floor(totalMonths / 12);
-                const restorationAgeMonths = totalMonths % 12;
-                let yearsString = `${restorationAgeYears} Years`;
-                let monthsString = (restorationAgeMonths === 1) ? `, 1 Month` : (restorationAgeMonths > 1) ? `, ${restorationAgeMonths} Months` : '';
-                restorationAgeDisplay = yearsString + monthsString;
-            }
+            const restorationAgeDisplay = formatYearsMonthsFromDates(dobDate, restorationDate);
             document.getElementById('age-at-restoration-output').textContent = restorationAgeDisplay;
+
+            const today = parseDate(getTodayDateString());
+            const remainingRestorationDisplay = restorationDate && restorationDate > today
+                ? formatYearsMonthsFromDates(today, restorationDate)
+                : 'Completed';
+            document.getElementById('period-remaining-restoration-output').textContent = restorationDate ? remainingRestorationDisplay : 'N/A';
 
 
             // 4. Financial Calculations (Only if Gross Pension > 0)
