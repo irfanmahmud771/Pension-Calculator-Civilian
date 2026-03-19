@@ -1314,6 +1314,8 @@
                 setCnicStatusMessage('');
                 checkInputEnabling();
             }
+            if (dobInput) dobInput.value = '';
+            if (modal) modal.classList.add('visible');
         }
 
         function closeCnicVerifyModal() {
