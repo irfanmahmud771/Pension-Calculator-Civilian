@@ -1560,6 +1560,8 @@
             const grossPensionPPOInput = document.getElementById('gross-pension-ppo');
             const pensionPenaltyInput = document.getElementById('pension-penalty');
             const grossPensionCalcInput = document.getElementById('gross-pension-calc'); // New field reference
+            const familyPensionInput = document.getElementById('family-pension');
+            const inServiceDeathInput = document.getElementById('in-service-death');
 
             const basicPay = parseFloat(document.getElementById('basic-pay').value.replace(/,/g, '')) || 0;
             const personnelPay = parseFloat(document.getElementById('personnel-pay').value.replace(/,/g, '')) || 0;
@@ -1618,8 +1620,12 @@
                 // So if SOS is 10-09-2024 or later, penalty applies.
                 const penaltyCutoff = new Date('2024-09-09T00:00:00Z');
                 const isPenaltyApplicable = sosDate && sosDate > penaltyCutoff;
+                const isInServiceDeath = familyPensionInput &&
+                                         inServiceDeathInput &&
+                                         familyPensionInput.value === 'Yes' &&
+                                         inServiceDeathInput.value === 'Yes';
 
-                if (isPenaltyApplicable && dobDate && sosDate) {
+                if (isPenaltyApplicable && !isInServiceDeath && dobDate && sosDate) {
                     // Superannuation Date = DOB + 60 years
                     const superannuationDate = new Date(dobDate);
                     superannuationDate.setUTCFullYear(superannuationDate.getUTCFullYear() + 60);
@@ -2410,6 +2416,8 @@
             // --- NEW LOGIC: Check if Penalty Card should be visible ---
             const penaltyCutoff = new Date('2024-09-09T00:00:00Z');
             const isPenaltyApplicable = sosDate && sosDate > penaltyCutoff;
+            const isInServiceDeath = familyPensionInput.value === 'Yes' && inServiceDeathInput && inServiceDeathInput.value === 'Yes';
+            const shouldApplyPenalty = isPenaltyApplicable && !isInServiceDeath;
 
             const penaltyCard = document.getElementById('penalty-card');
             const grossPensionLabel = document.getElementById('gross-pension-calc-label');
@@ -2418,12 +2426,12 @@
                 // UPDATED VISIBILITY LOGIC:
                 // Show only if applicable AND link is enabled.
                 // Removed dependency on coreInputsEnabled to allow visibility even before all fields are filled.
-                penaltyCard.style.display = (isPenaltyApplicable && linkEnabled) ? 'block' : 'none';
+                penaltyCard.style.display = (shouldApplyPenalty && linkEnabled) ? 'block' : 'none';
             }
 
             if (grossPensionLabel) {
                 // Update label based on applicability
-                grossPensionLabel.textContent = isPenaltyApplicable ? 'Gross Pension (Before Penalty)' : 'Gross Pension';
+                grossPensionLabel.textContent = shouldApplyPenalty ? 'Gross Pension (Before Penalty)' : 'Gross Pension';
             }
             // ----------------------------------------------------------
 
