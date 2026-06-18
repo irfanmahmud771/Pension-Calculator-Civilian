@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pension-civilan-v3';
+const CACHE_NAME = 'pension-civilan-v5';
 const APP_SHELL = [
   './',
   './index.html',
