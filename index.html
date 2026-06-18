@@ -1903,8 +1903,8 @@
                     restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
                     isNetCalculatedRestored = true;
                 } else if (year === 2025 || year === 2026) {
-                    const baselineNetCurrent = year === 2025 ? net2024_Current : net2025_Current;
-                    const baselineNetRestored = year === 2025 ? net2024_Restored : net2025_Restored;
+                    const baselineNetCurrent = net2024_Current;
+                    const baselineNetRestored = net2024_Restored;
 
                     currentBaseLine = baselineNetCurrent;
                     baseLineDisplayCurrent = formatCurrency(currentBaseLine, false, true);
