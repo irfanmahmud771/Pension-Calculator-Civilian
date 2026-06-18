@@ -1905,6 +1905,8 @@
                 } else if (year === 2025 || year === 2026) {
                     const baselineNetCurrent = net2024_Current;
                     const baselineNetRestored = net2024_Restored;
+                    const netBaseCurrent = year === 2025 ? baselineNetCurrent : net2025_Current;
+                    const netBaseRestored = year === 2025 ? baselineNetRestored : net2025_Restored;
 
                     currentBaseLine = baselineNetCurrent;
                     baseLineDisplayCurrent = formatCurrency(currentBaseLine, false, true);
@@ -1914,7 +1916,7 @@
                     } else {
                         currentIncreaseValue = 0;
                     }
-                    currentNetValue = roundToTwoDecimals(currentIncreaseValue + baselineNetCurrent);
+                    currentNetValue = roundToTwoDecimals(currentIncreaseValue + netBaseCurrent);
                     isNetCalculatedCurrent = true;
 
                     restoredBaseLine = baselineNetRestored;
@@ -1925,7 +1927,7 @@
                     } else {
                         restoredIncreaseValue = 0;
                     }
-                    restoredNetValue = roundToTwoDecimals(restoredBaseLine + restoredIncreaseValue);
+                    restoredNetValue = roundToTwoDecimals(restoredIncreaseValue + netBaseRestored);
                     isNetCalculatedRestored = true;
                 }
 
