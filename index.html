@@ -1721,6 +1721,8 @@
             const restoredNetValues = [];
             let net2024_Current = 0;
             let net2024_Restored = 0;
+            let net2025_Current = 0;
+            let net2025_Restored = 0;
 
             const netByYearCurrent = {}; // New object to capture net values by year for Medical Allowance formula
             const netByYearRestored = {};
@@ -1957,6 +1959,10 @@
                 if (year === 2024) {
                     net2024_Current = currentNetValue;
                     net2024_Restored = restoredNetValue;
+                }
+                if (year === 2025) {
+                    net2025_Current = currentNetValue;
+                    net2025_Restored = restoredNetValue;
                 }
 
                 // Table row population remains the same...
