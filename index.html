@@ -1998,9 +1998,9 @@
             return { current: currentNetValues, restored: restoredNetValues, netByYearCurrent, netByYearRestored };
         }
 
-        function formatYearsMonthsFromDates(startDate, endDate) {
+        function getCompletedYearsMonths(startDate, endDate) {
             if (!startDate || !endDate || endDate < startDate) {
-                return 'N/A';
+                return null;
             }
 
             let totalMonths = (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12;
@@ -2012,13 +2012,32 @@
             }
 
             if (totalMonths < 0) {
+                return null;
+            }
+
+            return {
+                years: Math.floor(totalMonths / 12),
+                months: totalMonths % 12
+            };
+        }
+
+        function formatCompactAgeFromDates(startDate, endDate) {
+            const completedAge = getCompletedYearsMonths(startDate, endDate);
+            if (!completedAge) {
                 return 'N/A';
             }
 
-            const years = Math.floor(totalMonths / 12);
-            const months = totalMonths % 12;
-            const yearsString = `${years} Years`;
-            const monthsString = months === 1 ? ', 1 Month' : months > 1 ? `, ${months} Months` : '';
+            return `${completedAge.years} Y ${completedAge.months} M`;
+        }
+
+        function formatYearsMonthsFromDates(startDate, endDate) {
+            const completedAge = getCompletedYearsMonths(startDate, endDate);
+            if (!completedAge) {
+                return 'N/A';
+            }
+
+            const yearsString = `${completedAge.years} Years`;
+            const monthsString = completedAge.months === 1 ? ', 1 Month' : completedAge.months > 1 ? `, ${completedAge.months} Months` : '';
 
             return yearsString + monthsString;
         }
@@ -2072,7 +2091,10 @@
             const bpsValue = parseInt(bpsInput.value); // Parse BPS value as integer
             const isFamilyPension = familyPensionInput.value === 'Yes';
 
-            document.getElementById('dob-display').textContent = formatDateDisplay(dobDate);
+            const dobDisplayText = dobDate
+                ? `${formatDateDisplay(dobDate)}${sosDate ? ` (Age ${formatCompactAgeFromDates(dobDate, sosDate)})` : ''}`
+                : formatDateDisplay(dobDate);
+            document.getElementById('dob-display').textContent = dobDisplayText;
             document.getElementById('doj-display').textContent = formatDateDisplay(dojDate);
             document.getElementById('sos-display').textContent = formatDateDisplay(sosDate);
 
