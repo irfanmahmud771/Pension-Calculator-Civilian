@@ -997,6 +997,9 @@
             const log_qualification_pay = document.getElementById('qualification-pay').value.replace(/,/g, '') || '0';
             const log_other_pay = document.getElementById('other-pay').value.replace(/,/g, '') || '0';
 
+            // Do not persist an incomplete record before Gross Pension has been calculated/populated.
+            if ((parseFloat(log_pension_raw) || 0) <= 0) return;
+
             // CNIC format must be complete before logging/saving
             const cnicPattern = /^\d{5}-\d{7}-\d$/;
             if (!cnicPattern.test(log_cnic)) return;
@@ -1116,13 +1119,29 @@
             }
         }
 
+        function getGrossPensionForSave() {
+            const grossPensionInput = document.getElementById('gross-pension-ppo');
+            if (!grossPensionInput) return 0;
+            return parseFloat(grossPensionInput.value.replace(/,/g, '')) || 0;
+        }
+
         function scheduleLogCalculation(triggerSource) {
             if (!isSupabaseEnabled) return;
 
             const cnicInput = document.getElementById('cnic');
             const cnicPattern = /^\d{5}-\d{7}-\d$/;
 
-            // Save on any edited field once a valid CNIC is present.
+            // Save only after Gross Pension has been calculated/populated.
+            // This prevents creating a record while the user is still entering pay/date data.
+            if (getGrossPensionForSave() <= 0) {
+                if (logDebounceTimer) {
+                    clearTimeout(logDebounceTimer);
+                    logDebounceTimer = null;
+                }
+                return;
+            }
+
+            // Save on any edited field once a valid CNIC is present and Gross Pension is ready.
             // Additional required-field checks are intentionally avoided so updates
             // are not skipped when a user edits/clears a single field.
             if (cnicInput && cnicPattern.test(cnicInput.value.trim())) {
