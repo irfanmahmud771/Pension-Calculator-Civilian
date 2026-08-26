@@ -848,6 +848,65 @@
         };
 
 
+        // Usual annual increment rates, indexed by the BPS selected in the form.
+        // A retirement must also fall in the 02 June–30 November annual eligibility window.
+        const usualIncrementPeriods = [
+            { from: '1972-07-01', to: '1977-06-30', year: 1972 },
+            { from: '1977-07-01', to: '1983-06-30', year: 1977 },
+            { from: '1983-07-01', to: '1987-06-30', year: 1983 },
+            { from: '1987-07-01', to: '1991-06-30', year: 1987 },
+            { from: '1991-07-01', to: '1994-06-30', year: 1991 },
+            { from: '1994-07-01', to: '2001-06-30', year: 1994 },
+            { from: '2001-12-01', to: '2005-06-30', year: 2001 },
+            { from: '2005-07-01', to: '2007-06-30', year: 2005 },
+            { from: '2007-07-01', to: '2008-06-30', year: 2007 },
+            { from: '2008-07-01', to: '2011-06-30', year: 2008 },
+            { from: '2011-07-01', to: '2015-06-30', year: 2011 },
+            { from: '2015-07-01', to: '2016-06-30', year: 2015 },
+            { from: '2016-07-01', to: '2017-06-30', year: 2016 },
+            { from: '2017-07-01', to: '2022-06-30', year: 2017 },
+            { from: '2022-07-01', to: '2026-06-30', year: 2022 },
+            { from: '2026-07-01', to: '9999-06-30', year: 2026 }
+        ];
+        const usualIncrementsByBps = {
+            1: [2, 5, 10, 13, 26, 35, 55, 65, 75, 90, 150, 195, 240, 290, 430, 520],
+            2: [3, 6, 12, 16, 32, 44, 65, 75, 85, 100, 170, 220, 275, 330, 490, 590],
+            3: [3, 7, 14, 19, 37, 50, 75, 85, 100, 120, 200, 260, 325, 390, 580, 700],
+            4: [4, 8, 16, 22, 43, 58, 85, 100, 115, 140, 230, 300, 370, 440, 660, 800],
+            5: [6, 10, 18, 25, 49, 66, 100, 115, 135, 160, 260, 340, 420, 500, 750, 910],
+            6: [8, 12, 20, 28, 54, 73, 110, 125, 145, 175, 290, 375, 470, 560, 840, 1010],
+            7: [10, 14, 23, 31, 60, 81, 120, 140, 160, 190, 320, 415, 510, 610, 910, 1100],
+            8: [12, 16, 26, 34, 65, 88, 130, 150, 175, 210, 350, 455, 560, 670, 1000, 1210],
+            9: [15, 20, 29, 38, 72, 97, 145, 165, 190, 230, 380, 495, 610, 730, 1090, 1310],
+            10: [18, 22, 32, 42, 79, 107, 160, 185, 215, 260, 420, 544, 670, 800, 1190, 1430],
+            11: [20, 24, 35, 46, 86, 116, 175, 200, 230, 275, 460, 595, 740, 880, 1310, 1580],
+            12: [20, 28, 40, 52, 96, 130, 195, 225, 260, 310, 500, 650, 800, 960, 1430, 1720],
+            13: [25, 30, 45, 58, 107, 144, 215, 245, 285, 340, 550, 715, 880, 1050, 1560, 1880],
+            14: [25, 30, 50, 64, 119, 161, 240, 275, 315, 380, 610, 790, 980, 1170, 1740, 2090],
+            15: [25, 35, 55, 71, 131, 177, 265, 305, 350, 420, 700, 905, 1120, 1330, 1980, 2380],
+            16: [35, 40, 80, 105, 146, 197, 295, 340, 390, 470, 800, 1035, 1280, 1520, 2260, 2720],
+            17: [50, 50, 120, 155, 215, 290, 465, 535, 615, 740, 1200, 1555, 1930, 2300, 3420, 4110],
+            18: [75, 75, 150, 195, 271, 366, 585, 675, 775, 930, 1500, 1950, 2400, 2870, 4260, 5120],
+            19: [80, 100, 160, 205, 285, 385, 615, 705, 810, 970, 1600, 2075, 2560, 3050, 4530, 5450],
+            20: [100, 125, 180, 235, 325, 440, 950, 1095, 1260, 1510, 2350, 3050, 3750, 4510, 6690, 8040],
+            21: [0, 150, 225, 290, 405, 545, 1070, 1230, 1415, 1700, 2600, 3375, 4150, 5000, 7420, 8920],
+            22: [0, 200, 250, 325, 450, 610, 1250, 1440, 1655, 1985, 3050, 3960, 4870, 5870, 8710, 10470]
+        };
+
+        function getUsualIncrement(sosDate, bps) {
+            if (!sosDate || !usualIncrementsByBps[bps]) return 0;
+
+            const month = sosDate.getUTCMonth();
+            const day = sosDate.getUTCDate();
+            const isWithinAnnualWindow = (month === 5 && day >= 2) || (month >= 6 && month <= 10);
+            if (!isWithinAnnualWindow) return 0;
+
+            const periodIndex = usualIncrementPeriods.findIndex(({ from, to }) =>
+                sosDate >= parseDate(from) && sosDate <= parseDate(to)
+            );
+            return periodIndex === -1 ? 0 : usualIncrementsByBps[bps][periodIndex] || 0;
+        }
+
         // --- 2. DATA CONSTANTS (Remain unchanged) ---
         // Place constants at the top level of the script
         const pensionData = [
@@ -2441,9 +2500,10 @@
             bpsInput.disabled = !sosFilled;
 
             const sosDate = parseDate(sosInput.value);
+            const bpsValue = parseInt(bpsInput.value, 10);
             const avgPayCutoffDate = parseDate('2024-12-31');
             const shouldUseAvgPayLabel = sosDate && sosDate > avgPayCutoffDate;
-            const isUsualIncrementEnabledByDate = sosDate && (sosDate.getUTCMonth() > 5 || (sosDate.getUTCMonth() === 5 && sosDate.getUTCDate() > 1));
+            const usualIncrement = getUsualIncrement(sosDate, bpsValue);
 
             if (basicPayLabel) {
                 basicPayLabel.textContent = shouldUseAvgPayLabel ? '24 Months Avg Pay Emoluments' : 'Basic Pay';
@@ -2486,13 +2546,11 @@
                 if (qualificationPayInput.disabled) qualificationPayInput.value = '';
             }
 
-            // Usual Increment (other-pay) is only enabled when date of retirement is greater than 01 June
+            // Apply the scheduled usual increment only for eligible retirement dates and BPS rates.
             if (otherPayInput) {
-                const shouldEnableOtherPay = payInputsEnabled && isUsualIncrementEnabledByDate;
-                otherPayInput.disabled = !shouldEnableOtherPay;
-                if (!shouldEnableOtherPay) {
-                    otherPayInput.value = '';
-                }
+                const shouldApplyUsualIncrement = payInputsEnabled && usualIncrement > 0;
+                otherPayInput.disabled = !shouldApplyUsualIncrement;
+                otherPayInput.value = shouldApplyUsualIncrement ? usualIncrement.toFixed(2) : '';
             }
 
             // Gross Pension is read-only if linked, editable if unlinked but enabled
