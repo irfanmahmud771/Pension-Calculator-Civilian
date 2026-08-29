@@ -376,7 +376,7 @@
                         <div class="input-group">
                             <label for="cnic">CNIC</label>
                             <div class="flex gap-2 items-center">
-                                <input type="text" id="cnic" class="calc-input flex-1" placeholder="00000-0000000-0" maxlength="15">
+                                <input type="text" id="cnic" class="calc-input flex-1" placeholder="00000-0000000-0" maxlength="15" disabled>
                                 <button id="load-cnic-data-btn" type="button" class="inline-flex items-center rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300">
                                     Load Data
                                 </button>
@@ -2480,9 +2480,9 @@
             const basicPayLabel = document.getElementById('basic-pay-label');
             const otherPayInput = document.getElementById('other-pay');
 
-            // CNIC entry remains available even when Name is blank.
-            const nameFilled = nameInput.value.trim() !== '';
-            cnicInput.disabled = false;
+            // A Name of at least five characters is required before CNIC entry.
+            const hasMinimumNameLength = nameInput.value.trim().length >= 5;
+            cnicInput.disabled = !hasMinimumNameLength;
 
             const cnicFilled = cnicInput.value.length === 15;
             dobInput.disabled = !cnicFilled || isExistingCnicBlocked(cnicInput.value);
