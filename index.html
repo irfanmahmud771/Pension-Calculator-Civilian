@@ -836,6 +836,17 @@
             return dateString;
         };
 
+        const formatLogTimestamp = (date = new Date()) => {
+            const day = String(date.getDate()).padStart(2, '0');
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const year = date.getFullYear();
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+
+            return `${day}-${month}-${year} ${hours}:${minutes}:${seconds}`;
+        };
+
         // RE-ADDED: Format visit count to K/M
         const formatVisitCount = (num) => {
             if (!num || num < 1000) {
@@ -1085,16 +1096,15 @@
             const restorationDateRaw = restorationDateOutput.textContent;
 
 
-            const now = new Date();
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = now.getFullYear();
-            const time = now.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            // This value represents the most recent save, rather than the row's original creation time.
+            // Build it from date parts so it is consistent across browser locales and hour cycles.
+            const displayTimestamp = formatLogTimestamp();
 
             // FIX: Use all-lowercase keys to match the database
             const logEntry = {
-                // created_at is added automatically by Supabase
-                displaytimestamp: `${day}-${month}-${year} ${time}`,
+                // created_at is added automatically by Supabase and remains the creation time.
+                // displaytimestamp is refreshed on every update and shown in the calculation log.
+                displaytimestamp: displayTimestamp,
                 triggersource: triggerSource,
 
                 // Input Fields
@@ -1118,39 +1128,27 @@
             };
 
             try {
-                // Persist directly to Supabase.
-                // Primary path: upsert by CNIC when a unique constraint exists.
-                let saveError = null;
-                const { error: upsertError } = await supabaseClient
+                // Update first so displaytimestamp is refreshed even when the logs table
+                // does not have a unique CNIC constraint required for an upsert.
+                const cnicVariants = [log_cnic];
+                if (log_cnic_digits_only) {
+                    cnicVariants.push(log_cnic_digits_only);
+                }
+
+                const { data: updateRows, error: updateError } = await supabaseClient
                     .from('logs')
-                    .upsert(logEntry, { onConflict: 'cnic' });
+                    .update(logEntry)
+                    .in('cnic', cnicVariants)
+                    .select('id')
+                    .limit(1);
 
-                saveError = upsertError;
-
-                // If DB does not have a unique index on CNIC, fallback to update-or-insert in Supabase.
-                if (saveError) {
-                    const cnicVariants = [log_cnic];
-                    if (log_cnic_digits_only) {
-                        cnicVariants.push(log_cnic_digits_only);
-                    }
-
-                    const { data: updateRows, error: updateError } = await supabaseClient
+                let saveError = updateError;
+                if (!saveError && (!Array.isArray(updateRows) || updateRows.length === 0)) {
+                    // No existing log was found, so create the initial record.
+                    const { error: insertError } = await supabaseClient
                         .from('logs')
-                        .update(logEntry)
-                        .in('cnic', cnicVariants)
-                        .select('id')
-                        .limit(1);
-
-                    if (updateError) {
-                        saveError = updateError;
-                    } else if (Array.isArray(updateRows) && updateRows.length > 0) {
-                        saveError = null;
-                    } else {
-                        const { error: insertError } = await supabaseClient
-                            .from('logs')
-                            .insert(logEntry);
-                        saveError = insertError;
-                    }
+                        .insert(logEntry);
+                    saveError = insertError;
                 }
 
                 if (saveError) throw saveError;
@@ -1468,7 +1466,7 @@
             if (modal) modal.classList.add('visible');
         }
 
-        function applyLogDataToForm(data) {
+        async function applyLogDataToForm(data) {
             const pensionerNameInput = document.getElementById('pensioner-name');
             const cnicInput = document.getElementById('cnic');
             const dobInput = document.getElementById('dob');
@@ -1544,10 +1542,23 @@
 
             checkInputEnabling();
             if (inServiceDeathInput) inServiceDeathInput.value = inServiceDeathVal;
+            // Rebuild Gross Pension from loaded pay emoluments before saving the log.
+            // Without this, a pay-based record has an empty Gross Pension during the
+            // save check and its timestamp is never refreshed after being loaded.
+            if (shouldRecalculateGrossPension) {
+                calculateTotalPay();
+            }
             calculateAndDisplayAll();
 
             if (isSupabaseEnabled) {
-                scheduleLogCalculation('Load Log Data (Debounced)');
+                // A load is a completed action, so save it immediately rather than
+                // relying on the normal input debounce. This refreshes the displayed
+                // timestamp for both manually entered and pay-based pension records.
+                if (logDebounceTimer) {
+                    clearTimeout(logDebounceTimer);
+                    logDebounceTimer = null;
+                }
+                await logCalculation('Load Log Data');
             }
         }
 
@@ -1636,8 +1647,8 @@
         }
 
 
-        function loadLogData(button) {
-            applyLogDataToForm(button.dataset);
+        async function loadLogData(button) {
+            await applyLogDataToForm(button.dataset);
         }
 
         // The stepper button functions are intentionally left as stubs
