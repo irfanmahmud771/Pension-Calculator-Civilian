@@ -1466,7 +1466,7 @@
             if (modal) modal.classList.add('visible');
         }
 
-        async function applyLogDataToForm(data) {
+        function applyLogDataToForm(data) {
             const pensionerNameInput = document.getElementById('pensioner-name');
             const cnicInput = document.getElementById('cnic');
             const dobInput = document.getElementById('dob');
@@ -1542,23 +1542,10 @@
 
             checkInputEnabling();
             if (inServiceDeathInput) inServiceDeathInput.value = inServiceDeathVal;
-            // Rebuild Gross Pension from loaded pay emoluments before saving the log.
-            // Without this, a pay-based record has an empty Gross Pension during the
-            // save check and its timestamp is never refreshed after being loaded.
-            if (shouldRecalculateGrossPension) {
-                calculateTotalPay();
-            }
             calculateAndDisplayAll();
 
             if (isSupabaseEnabled) {
-                // A load is a completed action, so save it immediately rather than
-                // relying on the normal input debounce. This refreshes the displayed
-                // timestamp for both manually entered and pay-based pension records.
-                if (logDebounceTimer) {
-                    clearTimeout(logDebounceTimer);
-                    logDebounceTimer = null;
-                }
-                await logCalculation('Load Log Data');
+                scheduleLogCalculation('Load Log Data (Debounced)');
             }
         }
 
@@ -1647,8 +1634,8 @@
         }
 
 
-        async function loadLogData(button) {
-            await applyLogDataToForm(button.dataset);
+        function loadLogData(button) {
+            applyLogDataToForm(button.dataset);
         }
 
         // The stepper button functions are intentionally left as stubs
