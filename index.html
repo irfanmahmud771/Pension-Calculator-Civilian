@@ -329,7 +329,7 @@
         /* --- End Mobile Styles --- */
     </style>
 </head>
-<body class="bg-gray-50 t  ext-gray-800">
+<body class="bg-gray-50 text-gray-800">
 
     <!-- App Warning Bar -->
     <div id="app-warning" class="p-4 text-center text-yellow-800 bg-yellow-100 rounded-lg m-4" style="display: none;"></div>
@@ -578,6 +578,10 @@
                             <span class="label w-1/3 whitespace-nowrap">Medical Allowance</span>
                             <span class="value w-1/3 text-right text-gray-800" id="medical-allowance-output">0</span>
                         </div>
+                         <div class="output-group">
+                            <span class="label w-1/3 whitespace-nowrap">Medical Allowance (2015)</span>
+                            <span class="value w-1/3 text-right text-gray-800" id="medical-allowance-2015-output">0</span>
+                        </div>
 
                         <!-- NEW: Total Payable Fields -->
                         <!-- UPDATED: Standardized formatting, removed bg-gray-100, removed font-bold, removed text-gray-700 from label -->
@@ -626,7 +630,7 @@
                             <th rowspan="2" class="bg-blue-100 text-blue-600 hidden-column">To</th>
                             <th colspan="2" class="bg-cyan-200 text-cyan-700 hidden-column">Minimum Pension</th>
                         </tr>
-                        <tr classs="sub-header">
+                        <tr class="sub-header">
                             <th>Base Line</th>
                             <th>Increase</th>
                             <th>Net</th>
@@ -1809,8 +1813,9 @@
         }
 
 
-        function populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension) {
-            const tbody = document.getElementById('increase-table-body');
+        function populateIncreaseTable(sosDate, grossPension, basePension, dobDate, isFamilyPension, renderTable = true) {
+            // renderTable=false runs the same calculation into a detached tbody (no on-screen change)
+            const tbody = renderTable ? document.getElementById('increase-table-body') : document.createElement('tbody');
             tbody.innerHTML = '';
 
             const date1977_04_30 = parseDate('1977-04-30');
@@ -2162,6 +2167,13 @@
             return yearsString + monthsString;
         }
 
+        function resetMedicalAllowanceOutputs() {
+            ['medical-allowance-output', 'medical-allowance-2015-output'].forEach(id => {
+                const out = document.getElementById(id);
+                if (out) out.textContent = '0';
+            });
+        }
+
         // NEW: Helper function to reset all output fields when calculation is skipped
         function resetOutputFields() {
             // Service Summary
@@ -2178,7 +2190,7 @@
             // Final Pension
             document.getElementById('pension-pm-current-output').textContent = '0';
             document.getElementById('pension-pm-restored-output').textContent = '0';
-            document.getElementById('medical-allowance-output').textContent = '0';
+            resetMedicalAllowanceOutputs();
             document.getElementById('total-payable-current-output').textContent = '0';
             document.getElementById('total-payable-restored-output').textContent = '0';
 
@@ -2298,7 +2310,7 @@
                 document.getElementById('commutation-amount-output').textContent = '-';
                 document.getElementById('pension-pm-current-output').textContent = '0';
                 document.getElementById('pension-pm-restored-output').textContent = '0';
-                document.getElementById('medical-allowance-output').textContent = '0';
+                resetMedicalAllowanceOutputs();
                 document.getElementById('total-payable-current-output').textContent = '0';
                 document.getElementById('total-payable-restored-output').textContent = '0';
                 document.getElementById('increase-table-body').innerHTML = '';
@@ -2369,52 +2381,45 @@
             // ----------------------------------------------------
             // Medical Allowance Final Calculation (Implementing IF($B$10>DATE(2015,6,30), B17, R17))
             // ----------------------------------------------------
+            // Medical Allowance:
+            //   Retired before 01-07-2017 -> based on current net pension after the 2010 increase (R17)
+            //   Retired on/after 01-07-2017 -> based on Net Pension (Before Increases) (B17)
+            //   BPS 1-15: 25% of base, BPS 16-22: 20% of base, rounded.
+            // Medical Allowance (2015) = 25% of Medical Allowance.
+            // Both are added into Total Payable (Current) and (Restored).
+            let medicalAllowanceBase = 0;
             let medicalAllowance = 0;
+            let medicalAllowance2015 = 0;
 
             if (grossPensionPPO > 0 && sosDate) {
-                const policyDate2015 = parseDate('2015-07-01');
+                const policyDate2017 = parseDate('2017-07-01');
 
-                let baseForBPSCalculation = 0;
-
-                // R17 (Net Pension after 2010 Increase) - This value is pulled from the increases table.
-                // NOTE: This value IS FAMILY-ADJUSTED, as per previous logic.
-                // If Family Pension is selected, R17 reflects the family-adjusted 2010 net pension.
-                const R17 = netValues.netByYearCurrent[2010] || medicalAllowanceBase_unadjusted;
-
-                if (sosDate >= policyDate2015) {
-                    // IF TRUE: Use B17 (Unadjusted Net Pension Before Increases)
-                    baseForBPSCalculation = medicalAllowanceBase_unadjusted;
-                } else {
-                    // IF FALSE: Use R17 (Net Pension after 2010 Increase - Family Adjusted)
-                    baseForBPSCalculation = R17;
+                // R17: current net pension after the 2010 increase.
+                // For family pension it must be worked out BEFORE the 75% family pension
+                // reduction, so re-run the increase chain on the full (PPO) pension, silently.
+                let R17 = netValues.netByYearCurrent[2010];
+                if (isFamilyPension) {
+                    const unadjustedNetValues = populateIncreaseTable(
+                        sosDate, grossPensionPPO, medicalAllowanceBase_unadjusted, dobDate, false, false
+                    );
+                    R17 = unadjustedNetValues.netByYearCurrent[2010];
                 }
-
-                let reductionFactor = 0;
+                if (!R17) R17 = medicalAllowanceBase_unadjusted;
+                const B17 = medicalAllowanceBase_unadjusted;
+                medicalAllowanceBase = sosDate < policyDate2017 ? R17 : B17;
 
                 if (!isNaN(bpsValue) && bpsValue >= 1 && bpsValue <= 22) {
-                    if (bpsValue <= 15) {
-                        reductionFactor = 0.25; // 25%
-                    } else { // 16 to 22
-                        reductionFactor = 0.20; // 20%
-                    }
-
-                    // Step 1: Apply BPS reduction to the selected base
-                    let calculatedAmount = baseForBPSCalculation * reductionFactor;
-
-                    // Step 2: Apply the additional 25% increase
-                    medicalAllowance = calculatedAmount * 1.25;
-                } else {
-                    medicalAllowance = 0;
+                    const reductionFactor = bpsValue <= 15 ? 0.25 : 0.20;
+                    medicalAllowance = Math.round(medicalAllowanceBase * reductionFactor);
+                    medicalAllowance2015 = Math.round(medicalAllowance * 0.25);
                 }
-
-                // Step 3: Apply Rounding
-                medicalAllowance = Math.round(medicalAllowance); // Changed to Round
             }
+            const medicalAllowanceTotal = medicalAllowance + medicalAllowance2015;
             // ----------------------------------------------------
 
             // NEW: Total Payable Calculations (Rounded to whole number, same as Pension)
-            const totalPayableCurrent = Math.round(finalPensionCurrent + medicalAllowance); // Changed to Round
-            const totalPayableRestored = Math.round(finalPensionRestored + medicalAllowance); // Changed to Round
+            const totalPayableCurrent = Math.round(finalPensionCurrent + medicalAllowanceTotal);
+            const totalPayableRestored = Math.round(finalPensionRestored + medicalAllowanceTotal);
 
             document.getElementById('gross-pension-output').textContent = formatCurrency(grossPension);
             document.getElementById('net-pension-pre-increase-output').textContent = formatCurrency(basePension);
@@ -2423,6 +2428,7 @@
             document.getElementById('pension-pm-current-output').textContent = formatCurrency(finalPensionCurrent, true);
             document.getElementById('pension-pm-restored-output').textContent = formatCurrency(finalPensionRestored, true);
             document.getElementById('medical-allowance-output').textContent = formatCurrency(medicalAllowance, true);
+            document.getElementById('medical-allowance-2015-output').textContent = formatCurrency(medicalAllowance2015, true);
 
             // NEW: Display Total Payable Fields
             document.getElementById('total-payable-current-output').textContent = formatCurrency(totalPayableCurrent, true);
@@ -2432,7 +2438,7 @@
             currentCalculatedValues.pensionCurrent = totalPayableCurrent;
             currentCalculatedValues.pensionRestored = totalPayableRestored;
             currentCalculatedValues.restorationDate = restorationDate ? formatDateDisplay(restorationDate) : 'N/A';
-            currentCalculatedValues.medicalAllowance = medicalAllowance;
+            currentCalculatedValues.medicalAllowance = medicalAllowanceTotal;
 
             // Trigger debounced log sync after calculations
             scheduleLogCalculation('Input Change (Debounced)');
@@ -3032,7 +3038,7 @@
                 });
             } else {
                  // If Supabase is off, hide the buttons
-                if(clearLogBtn) clearLogBtn.style.display = 'none';
+                
                 if(showLogBtn) showLogBtn.style.display = 'none';
             }
 
