@@ -8,6 +8,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Nastaliq+Urdu:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- RE-ADDED: Supabase JS Client for logging and counter -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -327,6 +328,50 @@
             }
         }
         /* --- End Mobile Styles --- */
+        /* --- Language toggle (English / Urdu) --- */
+        /* Same look as the Pension Airmen app: emerald button, top-right */
+        #lang-toggle-btn {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            z-index: 50;
+            background-color: #059669;
+            color: #fff;
+            border: none;
+            border-radius: 0.25rem;
+            padding: 0.375rem 1rem;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
+            transition: background-color 0.15s;
+            font-family: 'Noto Nastaliq Urdu', serif;
+        }
+        #lang-toggle-btn:hover { background-color: #047857; }
+        body.lang-ur #lang-toggle-btn { font-family: 'Inter', sans-serif; }
+        @media (max-width: 1023px), (display-mode: standalone) {
+            #lang-toggle-btn { position: static !important; display: block; margin: 0 0 12px auto; }
+        }
+        body.lang-ur,
+        body.lang-ur *:not(#lang-toggle-btn):not(input):not(select) {
+            font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', serif !important;
+        }
+        body.lang-ur input, body.lang-ur select {
+            font-family: 'Noto Nastaliq Urdu', 'Inter', serif;
+            direction: ltr;
+        }
+        body.lang-ur .input-group label,
+        body.lang-ur .output-group .label,
+        body.lang-ur h1, body.lang-ur h2, body.lang-ur h3 {
+            line-height: 2.1;
+        }
+        body.lang-ur .increase-table th { text-transform: none; }
+        /* Urdu: keep the Calculation Log scroll bar on the right edge (log text itself is English) */
+        body.lang-ur #log-container { direction: ltr; text-align: left; }
+        /* Urdu: keep values in "Final Pension After Increases" at the left edge, like Service Summary */
+        body.lang-ur .output-group .value.text-right { text-align: left; }
+        body.lang-ur .output-group .w-1\/3 { width: auto; }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
@@ -346,6 +391,9 @@
     </div>
 
     <div class="container mx-auto p-4 md:p-8 relative">
+
+        <!-- Language toggle: English / Urdu -->
+        <button id="lang-toggle-btn" type="button" data-no-i18n aria-label="Change language">اردو</button>
 
         <header class="text-center mb-8 mt-4 md:mt-0">
             <h1 class="text-3xl md:text-4xl font-bold text-gray-700">Pension Calculator Federal Civilan</h1>
@@ -3051,6 +3099,930 @@
             checkInputEnabling();
         });
 
+    </script>
+    <!-- ====================================================================== -->
+    <!-- LANGUAGE TOGGLE (display-only translation layer; no calculation logic touched) -->
+    <!-- ====================================================================== -->
+    <script>
+    (function () {
+        const dict = {
+            'Pension Calculator Federal Civilan': 'پنشن کیلکولیٹر وفاقی سول ملازمین',
+            '(For Retirement date 01 July, 1986 to till now)': '(ریٹائرمنٹ کی تاریخ یکم جولائی 1986 سے تاحال کے لیے)',
+            'Install App (Windows / Android)': 'ایپ انسٹال کریں (ونڈوز / اینڈرائیڈ)',
+            'Input Details': 'اندراج کی تفصیلات',
+            'Service & Personal': 'سروس اور ذاتی معلومات',
+            'Name': 'نام',
+            'CNIC': 'شناختی کارڈ نمبر (CNIC)',
+            'Load Data': 'ڈیٹا لوڈ کریں',
+            'Date of Birth (DOB)': 'تاریخ پیدائش (DOB)',
+            'Date of Joining (DOJ)': 'تاریخ تقرری (DOJ)',
+            'Date of Retirment (SOS)': 'تاریخ ریٹائرمنٹ (SOS)',
+            'BPS (Basic Pay Scale)': 'بی پی ایس (بنیادی پے اسکیل)',
+            'Select BPS': 'بی پی ایس منتخب کریں',
+            'Family Pension': 'فیملی پنشن',
+            'In Service Death': 'دورانِ سروس وفات',
+            'Yes': 'ہاں',
+            'No': 'نہیں',
+            'Gross Pension': 'مجموعی پنشن',
+            'Gross Pension (Before Penalty)': 'مجموعی پنشن (کٹوتی سے پہلے)',
+            '(Remove check for manual entry)': '(دستی اندراج کے لیے نشان ہٹائیں)',
+            'Pay Components (for Gross Pension)': 'تنخواہ کے اجزاء (مجموعی پنشن کے لیے)',
+            'Basic Pay': 'بنیادی تنخواہ',
+            '24 Months Avg Pay Emoluments': '24 ماہ کی اوسط تنخواہ و مراعات',
+            'Personnel Pay': 'ذاتی تنخواہ',
+            'Other Pay': 'متفرق تنخواہ',
+            'Usual Increment': 'معمول کا اضافہ',
+            'Total Pay': 'کل تنخواہ',
+            'Penalty in Gross Pension': 'مجموعی پنشن میں کٹوتی',
+            'Total Months before Superannuation': 'سپرانویشن سے پہلے کل مہینے',
+            'Deduction Amount': 'کٹوتی کی رقم',
+            'Calculated Results': 'حسابی نتائج',
+            'Service Summary': 'سروس کا خلاصہ',
+            'Qualifying Service (QS)': 'کوالیفائنگ سروس (QS)',
+            'Age on next Birthday': 'اگلی سالگرہ پر عمر',
+            'Commutation Purchase Value': 'کموٹیشن خریداری قدر',
+            'Pension Details': 'پنشن کی تفصیلات',
+            'Net Pension (Before Increases)': 'نیٹ پنشن (اضافے سے پہلے)',
+            'Commuted Pension': 'کموٹڈ پنشن',
+            'Commutation Amount': 'کموٹیشن کی رقم',
+            'Final Pension After Increases': 'اضافوں کے بعد حتمی پنشن',
+            'Pension (Current)': 'پنشن (موجودہ)',
+            'Pension (After Restoration)': 'پنشن (بحالی کے بعد)',
+            'Medical Allowance': 'میڈیکل الاؤنس',
+            'Medical Allowance (2015)': 'میڈیکل الاؤنس (2015)',
+            'Total Payable (Current)': 'کل قابلِ ادائیگی (موجودہ)',
+            'Total Payable (Restored)': 'کل قابلِ ادائیگی (بحال شدہ)',
+            'Pension Restoration Date': 'پنشن بحالی کی تاریخ',
+            'Age on Pension Restoration': 'پنشن بحالی پر عمر',
+            'Period Remaing in Restoration': 'بحالی میں باقی مدت',
+            'Pension Increase Calculations': 'پنشن اضافوں کا حساب',
+            'Increase Year': 'اضافے کا سال',
+            '%age': 'فیصد',
+            'Current': 'موجودہ',
+            'After Restoration': 'بحالی کے بعد',
+            'Base Line': 'بیس لائن',
+            'Increase': 'اضافہ',
+            'Net': 'نیٹ',
+            'CONDITIONAL': 'مشروط',
+            'Total Logs:': 'کل لاگز:',
+            'Total Visits:': 'کل وزٹس:',
+            'Calculation Log': 'حساب کا لاگ',
+            'Show Log': 'لاگ دکھائیں',
+            'Logs are hidden. Click "Show Log" to view.': 'لاگز چھپے ہوئے ہیں۔ دیکھنے کے لیے "لاگ دکھائیں" پر کلک کریں۔',
+            'Log is empty.': 'لاگ خالی ہے۔',
+            'Loading logs...': 'لاگز لوڈ ہو رہے ہیں...',
+            'Enter Password': 'پاس ورڈ درج کریں',
+            'Password': 'پاس ورڈ',
+            'Incorrect password. Please try again.': 'پاس ورڈ غلط ہے۔ دوبارہ کوشش کریں۔',
+            'Cancel': 'منسوخ کریں',
+            'Confirm': 'تصدیق کریں',
+            'CNIC Already Exist Enter Date of Birth': 'شناختی کارڈ پہلے سے موجود ہے، تاریخ پیدائش درج کریں',
+            'Enter the saved date of birth to verify and load data from database.': 'تصدیق اور ڈیٹا بیس سے ڈیٹا لوڈ کرنے کے لیے محفوظ شدہ تاریخ پیدائش درج کریں۔',
+            'Date of Birth': 'تاریخ پیدائش',
+            'Verify': 'تصدیق کریں',
+            'Date of Birth does not match our record.': 'تاریخ پیدائش ہمارے ریکارڈ سے مطابقت نہیں رکھتی۔',
+            'Please enter Date of Birth.': 'براہ کرم تاریخ پیدائش درج کریں۔',
+            'ATTENTION': 'توجہ',
+            'If you want to enter Gross Pension select "Yes" and "No" for calculating by entering pay Emoluments.': 'اگر آپ مجموعی پنشن خود درج کرنا چاہتے ہیں تو "ہاں" منتخب کریں، اور تنخواہ و مراعات درج کر کے حساب لگانے کے لیے "نہیں" منتخب کریں۔',
+            'Completed': 'مکمل',
+            'N/A': 'دستیاب نہیں'
+        };
+        const placeholders = {
+            'Enter password': 'پاس ورڈ درج کریں'
+        };
+        const months = { JAN:'جنوری', FEB:'فروری', MAR:'مارچ', APR:'اپریل', MAY:'مئی', JUN:'جون', JUL:'جولائی', AUG:'اگست', SEP:'ستمبر', OCT:'اکتوبر', NOV:'نومبر', DEC:'دسمبر' };
+
+        function translateString(s) {
+            const t = s.trim();
+            if (!t) return s;
+            const lead = s.slice(0, s.indexOf(t));
+            const trail = s.slice(s.indexOf(t) + t.length);
+            if (Object.prototype.hasOwnProperty.call(dict, t)) return lead + dict[t] + trail;
+            let r = t
+                .replace(/\(Age /g, '(عمر ')
+                .replace(/\b(\d+) Y (\d+) M\b/g, '$1 سال $2 ماہ')
+                .replace(/\b(\d+) Years?\b/g, '$1 سال')
+                .replace(/\b(\d+) Months?\b/g, '$1 ماہ')
+                .replace(/Rs\.\s*([\d,]+(?:\.\d+)?)/g, '$1 روپے')
+                .replace(/\b(\d{2})-(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)-(\d{4})\b/g,
+                    (m, d, mon, y) => d + '-' + months[mon] + '-' + y);
+            return r === t ? s : lead + r + trail;
+        }
+
+        const state = new WeakMap(); // text node -> { orig, tr }
+        let urdu = false;
+        let observer = null;
+
+        function skip(node) {
+            const el = node.parentElement;
+            if (!el) return true;
+            const tag = el.tagName;
+            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA') return true;
+            return !!el.closest('[data-no-i18n]');
+        }
+
+        function translateNode(node) {
+            if (skip(node)) return;
+            const rec = state.get(node);
+            const cur = node.nodeValue;
+            if (rec && rec.tr === cur) return; // already translated, unchanged
+            const out = translateString(cur);
+            if (out !== cur) {
+                state.set(node, { orig: cur, tr: out });
+                node.nodeValue = out;
+            }
+        }
+
+        function walk(root, fn) {
+            if (root.nodeType === 3) { fn(root); return; }
+            const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+            let n;
+            const list = [];
+            while ((n = w.nextNode())) list.push(n);
+            list.forEach(fn);
+        }
+
+        function setPlaceholders(toUrdu) {
+            document.querySelectorAll('[placeholder]').forEach(el => {
+                const cur = el.getAttribute('placeholder');
+                if (toUrdu) {
+                    if (placeholders[cur]) {
+                        el.setAttribute('data-orig-placeholder', cur);
+                        el.setAttribute('placeholder', placeholders[cur]);
+                    }
+                } else if (el.hasAttribute('data-orig-placeholder')) {
+                    el.setAttribute('placeholder', el.getAttribute('data-orig-placeholder'));
+                    el.removeAttribute('data-orig-placeholder');
+                }
+            });
+        }
+
+        function startObserver() {
+            if (observer) return;
+            observer = new MutationObserver(muts => {
+                muts.forEach(m => {
+                    if (m.type === 'characterData') translateNode(m.target);
+                    else m.addedNodes.forEach(n => { if (n.nodeType === 1 || n.nodeType === 3) walk(n, translateNode); });
+                });
+            });
+            observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+        }
+
+        function stopObserver() {
+            if (observer) { observer.disconnect(); observer = null; }
+        }
+
+        const originalTitle = document.title;
+
+        function setLanguage(toUrdu) {
+            urdu = toUrdu;
+            const btn = document.getElementById('lang-toggle-btn');
+            if (toUrdu) {
+                stopObserver();
+                walk(document.body, translateNode);
+                setPlaceholders(true);
+                document.title = dict[originalTitle] || originalTitle;
+                document.documentElement.lang = 'ur';
+                document.documentElement.dir = 'rtl';
+                document.body.classList.add('lang-ur');
+                if (btn) btn.textContent = 'English';
+                startObserver();
+            } else {
+                stopObserver();
+                walk(document.body, node => {
+                    const rec = state.get(node);
+                    if (rec && node.nodeValue === rec.tr) node.nodeValue = rec.orig;
+                    state.delete(node);
+                });
+                setPlaceholders(false);
+                document.title = originalTitle;
+                document.documentElement.lang = 'en';
+                document.documentElement.dir = 'ltr';
+                document.body.classList.remove('lang-ur');
+                if (btn) btn.textContent = 'اردو';
+            }
+            try { localStorage.setItem('pension-calc-lang', toUrdu ? 'ur' : 'en'); } catch (e) {}
+        }
+
+        const btn = document.getElementById('lang-toggle-btn');
+        if (btn) btn.addEventListener('click', () => setLanguage(!urdu));
+
+        let saved = 'en';
+        try { saved = localStorage.getItem('pension-calc-lang') || 'en'; } catch (e) {}
+        if (saved === 'ur') setLanguage(true);
+    })();
+    </script>
+    <!-- ====================================================================== -->
+    <!-- URDU NAME DISPLAY (display-only; the typed/saved Name value is never changed) -->
+    <!-- ====================================================================== -->
+    <script>
+    (function () {
+        const input = document.getElementById('pensioner-name');
+        if (!input || !input.parentElement) return;
+
+        // ---- Dictionary of common Pakistani / Muslim names: "roman,variants=اردو" (one entry per line) ----
+        const DICT = `
+muhammad,mohammad,mohammed,muhammed,mohd,mohamad,muhamad,md,mohamed,mahomed,mahammad=محمد
+ahmed,ahmad,ahmet=احمد
+ali=علی
+hassan,hasan=حسن
+hussain,hussein,husain,hussaini=حسین
+hasnain=حسنین
+umar,omar=عمر
+usman,uthman,osman=عثمان
+bilal=بلال
+imran=عمران
+irfan,erfan=عرفان
+adnan=عدنان
+kamran=کامران
+salman=سلمان
+faisal,faizal=فیصل
+farhan=فرحان
+fahad,fahd=فہد
+fawad,fuad=فواد
+faraz=فراز
+farooq,farouk,faruq=فاروق
+fareed,farid=فرید
+fazal,fazl,fazle=فضل
+fida=فدا
+ghulam,gulam=غلام
+ghazanfar=غضنفر
+ghani=غنی
+haider,hyder,haidar=حیدر
+hamza,hamzah=حمزہ
+hamid=حامد
+hameed=حمید
+haroon,harun=ہارون
+hashim,hasham,hisham=ہاشم
+haseeb,hasib=حسیب
+hafiz,hafeez=حافظ
+habib=حبیب
+hanif,haneef=حنیف
+hidayat=ہدایت
+ibrahim,ebrahim=ابراہیم
+idrees,idris=ادریس
+ijaz,ejaz=اعجاز
+ikram=اکرام
+ilyas,elyas=الیاس
+iqbal=اقبال
+ishaq,ishaque=اسحاق
+ismail,ismael,ismaeel=اسماعیل
+israr=اسرار
+jabbar=جبار
+jalal=جلال
+jamil,jameel=جمیل
+javed,javaid,jawed,jawaid=جاوید
+jawad=جواد
+junaid,junaed=جنید
+kabir=کبیر
+kalim,kaleem=کلیم
+karim,kareem=کریم
+khalid,khaled=خالد
+khalil,khaleel=خلیل
+khurram,khuram=خرم
+khurshid,khursheed=خورشید
+liaqat,liaquat=لیاقت
+luqman=لقمان
+latif,lateef=لطیف
+mahmood,mehmood,mahmud=محمود
+majid=ماجد
+majeed=مجید
+manzoor,manzur=منظور
+masood,masud=مسعود
+mazhar=مظہر
+mubashir,mubasher=مبشر
+mudassar,mudasir,mudasser=مدثر
+mujahid=مجاہد
+mukhtar,mukhtiar=مختار
+munir,muneer=منیر
+munawar,munawwar=منور
+murtaza,murtuza=مرتضیٰ
+musa,moosa=موسیٰ
+mustafa,mustapha=مصطفیٰ
+mushtaq=مشتاق
+muzaffar=مظفر
+nadeem,nadim=ندیم
+naeem,naim=نعیم
+nasir,nasser=ناصر
+naseer=نصیر
+nauman,numan,noman,nouman=نعمان
+nawaz=نواز
+nazir,nazeer=نذیر
+nisar=نثار
+noor,nur=نور
+nadir=نادر
+nabeel,nabil=نبیل
+naveed,navid=نوید
+parvez,pervez,pervaiz,parvaiz=پرویز
+qadir=قادر
+qadeer=قدیر
+qamar=قمر
+qasim,kasim=قاسم
+rafiq,rafique,rafeeq=رفیق
+rahim,raheem=رحیم
+rahman,rehman,rahmaan=رحمان
+rahmat,rehmat=رحمت
+raja=راجہ
+rashid=راشد
+rasheed=رشید
+rauf,raoof=رؤف
+raza,reza=رضا
+riaz,riyaz=ریاض
+rizwan,ridwan=رضوان
+rustam=رستم
+sabir=صابر
+sadiq,sadique,sadeeq=صادق
+safdar=صفدر
+saeed,sayeed=سعید
+sajid=ساجد
+sajjad=سجاد
+salah=صلاح
+saleem,salim=سلیم
+sarfraz,sarfaraz=سرفراز
+sarwar=سرور
+shabbir,shabir=شبیر
+shafiq,shafique=شفیق
+shahid=شاہد
+shahzad,shehzad=شہزاد
+shakeel,shakil=شکیل
+shakoor,shakur=شکور
+shams=شمس
+sharif=شریف
+shaukat=شوکت
+shoaib,shuaib=شعیب
+siddique,siddiq,siddiqe=صدیق
+sikandar,sikander=سکندر
+sohail,suhail=سہیل
+sulaiman,suleman,sulaman,sulman=سلیمان
+sultan=سلطان
+tahir,taher=طاہر
+tahseen=تحسین
+talat,talaat=طلعت
+talha=طلحہ
+tanveer,tanvir=تنویر
+tariq,tarik=طارق
+tauseef=توصیف
+tayyab,tayab,tayyeb=طیب
+umair,omair=عمیر
+usama,osama=اسامہ
+waheed=وحید
+wahid=واحد
+wajid=واجد
+waqar=وقار
+waqas=وقاص
+waseem,wasim=وسیم
+yaqoob,yakub,yaqub=یعقوب
+yasin,yaseen=یاسین
+yasir,yasser=یاسر
+younas,yunus,yunis=یونس
+yousaf,yousuf,yusuf=یوسف
+zafar=ظفر
+zahid=زاہد
+zaheer,zahir=ظہیر
+zahoor=ظہور
+zain,zayn=زین
+zakaria,zakariya,zakriya=زکریا
+zamir,zameer=ضمیر
+zubair,zubayr=زبیر
+zulfiqar,zulfikar=ذوالفقار
+zia,ziya=ضیاء
+anwar=انور
+arshad=ارشد
+asif=آصف
+aslam=اسلم
+asghar=اصغر
+ashfaq=اشفاق
+ashraf=اشرف
+akram=اکرم
+akbar=اکبر
+amin,ameen=امین
+amir,ameer=امیر
+amjad=امجد
+anees,anis=انیس
+arif=عارف
+ayub,ayyub=ایوب
+azhar=اظہر
+aziz,azeez=عزیز
+babar,babur=بابر
+bashir,basheer=بشیر
+basit=باسط
+bakhtiar,bakhtyar=بختیار
+dawood,daud,dawud=داؤد
+dilawar=دلاور
+ehsan,ihsan=احسان
+fayyaz=فیاض
+gohar=گوہر
+hakim,hakeem=حکیم
+ilahi,elahi,ilahee=الٰہی
+inayat=عنایت
+irshad=ارشاد
+jahangir=جہانگیر
+moin,moeen=معین
+mubarak=مبارک
+mumtaz=ممتاز
+nazim=ناظم
+niaz,niyaz=نیاز
+qaiser,qaisar,kaiser=قیصر
+rehan,rayan=ریحان
+saad=سعد
+sadaqat=صداقت
+shafqat=شفقت
+shamim=شمیم
+sher=شیر
+tufail,tufael=طفیل
+wali=ولی
+zeeshan,zishan=ذیشان
+zohaib,zuhaib=زہیب
+asad=اسد
+ayaz=ایاز
+aamir,amer=عامر
+abid,aabid=عابد
+abbas=عباس
+abdullah=عبداللہ
+abu=ابو
+adil,adeel,adel=عادل
+afzal=افضل
+aftab=آفتاب
+ahsan=احسن
+ajmal=اجمل
+akhtar,akhter=اختر
+alam=عالم
+altaf=الطاف
+amanat=امانت
+ammar=عمار
+arslan=ارسلان
+atif=عاطف
+ata,atta=عطا
+azeem,azim=عظیم
+bakht=بخت
+burhan=برہان
+danish=دانش
+daniyal,danial=دانیال
+farrukh,farukh=فرخ
+fakhar,fakhr=فخر
+gulzar=گلزار
+hammad=حماد
+haris,harith=حارث
+huzaifa,huzaifah,hudhaifa=حذیفہ
+iftikhar=افتخار
+imtiaz,imtiyaz=امتیاز
+intizar=انتظار
+jamshed,jamshaid=جمشید
+kashif=کاشف
+khawar=خاور
+khizar,khizr=خضر
+mansoor,mansur=منصور
+matloob=مطلوب
+moazzam,muazzam=معظم
+mohsin,muhsin=محسن
+mubeen=مبین
+muneeb=منیب
+muslim=مسلم
+saif=سیف
+shahbaz=شہباز
+shahnawaz=شاہ نواز
+shahrukh=شاہ رخ
+sharjeel=شرجیل
+shehryar,shahryar=شہریار
+tabish=تابش
+taimoor,taimur,timur=تیمور
+ubaid,obaid=عبید
+uzair=عزیر
+wajahat=وجاہت
+yawar=یاور
+zaid,zayd=زید
+tasawar,tasawwar,tasavvur=تصور
+faizan,faizaan=فیضان
+fiaz=فیاض
+faiz,fayz=فیض
+rizwana=رضوانہ
+shahzaib=شاہ زیب
+shehroz,shahroz=شہروز
+sufyan,sofian=سفیان
+suleiman=سلیمان
+tahmeed=تحمید
+touseef=توصیف
+waleed,walid=ولید
+yasar=یسار
+zeshan=ذیشان
+ahtisham=احتشام
+atiq,ateeq=عتیق
+ayyaz=ایاز
+dilshad=دلشاد
+ghayas,ghias=غیاث
+hussnain=حسنین
+irtiza=ارتضیٰ
+kaleemullah=کلیم اللہ
+mudassir=مدثر
+nadir=نادر
+qaisrani=قیصرانی
+rehmani=رحمانی
+shafaat=شفاعت
+shehbaz=شہباز
+zubair=زبیر
+ayesha,aisha,aysha=عائشہ
+fatima,fatimah=فاطمہ
+khadija,khadijah=خدیجہ
+maryam,mariam,mariyam=مریم
+zainab,zaynab=زینب
+ruqayya,ruqaiya=رقیہ
+sumaiya,sumayya=سمیہ
+safia,safiya,sofia=صفیہ
+hafsa,hafsah=حفصہ
+asma=اسماء
+amina,aminah,amna=آمنہ
+bushra,bushrah=بشریٰ
+nasreen,nasrin=نسرین
+shaheen=شاہین
+parveen,perveen=پروین
+razia,raziya=رضیہ
+rukhsana=رخسانہ
+shabana=شبانہ
+saima,sayma=صائمہ
+sadia,saadia=سعدیہ
+sana=ثناء
+samina=ثمینہ
+naseem,nasim=نسیم
+nazia,naziya=نازیہ
+nazish=نازش
+noreen,noorin=نورین
+nusrat=نصرت
+rabia,rabiya=رابعہ
+rehana,rihana=ریحانہ
+rubina=روبینہ
+saba=صبا
+sabiha=صبیحہ
+sabina=سبینہ
+saira,sara,sarah=سارہ
+shazia=شازیہ
+shahida=شاہدہ
+shehla,shahla=شہلا
+tahira=طاہرہ
+tasneem,tasnim=تسنیم
+uzma,azma=عظمیٰ
+yasmin,yasmeen=یاسمین
+zahida=زاہدہ
+zubaida,zubeda=زبیدہ
+zeenat,zinat=زینت
+zarina=زرینہ
+farzana=فرزانہ
+farhat=فرحت
+fouzia,fauzia=فوزیہ
+ghazala=غزالہ
+gulnaz=گلناز
+humaira=حمیرا
+kausar,kauser=کوثر
+kiran=کرن
+lubna=لبنیٰ
+mehnaz=مہناز
+memona,maimoona=میمونہ
+nargis=نرگس
+nighat=نگہت
+nilofar=نیلوفر
+saleema=سلیمہ
+samreen=ثمرین
+shagufta=شگفتہ
+sidra=سدرہ
+sobia=سوبیہ
+sumbul=سنبل
+tabassum=تبسم
+wajiha=وجیہہ
+mehwish,mahwish=ماہ وش
+nida=ندا
+iqra=اقراء
+hina,heena=حنا
+kanwal,kanval=کنول
+maham=ماہم
+mahnoor=ماہ نور
+areeba=اریبہ
+anum,anam=انعم
+aliya,aaliya=عالیہ
+zoya,zoha=زویا
+begum=بیگم
+bibi,bi=بی بی
+bano,banu=بانو
+khatoon,khatun=خاتون
+mai=مائی
+ullah,allah=اللہ
+din,deen=دین
+haq,haque=حق
+nisa=النساء
+jan=جان
+gul=گل
+khan=خان
+shah=شاہ
+syed,sayed,saiyed,sayyid,saiyad=سید
+malik=ملک
+chaudhry,chaudhary,choudhry,chaudhri,chowdhry,chaudry,chodhry=چوہدری
+rana=رانا
+mirza=مرزا
+butt,bhatt=بٹ
+awan=اعوان
+abbasi=عباسی
+mughal,mughul=مغل
+qureshi,quraishi,qureshy=قریشی
+ansari=انصاری
+siddiqui,siddiqi=صدیقی
+farooqi=فاروقی
+usmani=عثمانی
+alvi,alavi=علوی
+hashmi=ہاشمی
+rizvi=رضوی
+naqvi=نقوی
+bukhari,bokhari=بخاری
+gillani,gilani=گیلانی
+kazmi,kazimi=کاظمی
+jafri,jaffri=جعفری
+zaidi=زیدی
+rajput=راجپوت
+gujjar,gujar=گجر
+jat=جٹ
+arain=ارائیں
+sheikh,shaikh,shaykh=شیخ
+pathan=پٹھان
+yousafzai,yusufzai=یوسفزئی
+afridi=آفریدی
+khattak=خٹک
+mohmand=مہمند
+orakzai=اورکزئی
+wazir=وزیر
+bangash=بنگش
+durrani=درانی
+niazi=نیازی
+lodhi,lodi=لودھی
+marwat=مروت
+mehsud,mahsud=محسود
+shinwari=شنواری
+tanoli=تنولی
+swati=سواتی
+qazi,kazi=قاضی
+baloch,baluch=بلوچ
+bugti=بگٹی
+marri=مری
+mengal=مینگل
+rind=رند
+leghari=لغاری
+mazari=مزاری
+bhutto=بھٹو
+soomro=سومرو
+memon=میمن
+ghauri,ghori=غوری
+cheema=چیمہ
+virk=ورک
+sandhu=سندھو
+gondal=گوندل
+warraich=وڑائچ
+tarar=تارڑ
+bajwa=باجوہ
+ghumman=گھمن
+dogar=ڈوگر
+kharal=کھرل
+sial=سیال
+tiwana=ٹوانہ
+noon=نون
+khokhar=کھوکھر
+janjua=جنجوعہ
+minhas=منہاس
+satti=ستی
+kiani,kayani=کیانی
+lashari=لاشاری
+jatoi=جتوئی
+talpur=تالپور
+junejo=جونیجو
+chandio=چانڈیو
+`;
+        // Names that follow "Abdul / Abdur / Abdus" (written joined: عبدالرحمن)
+        const ABDUL = `
+rehman,rahman=الرحمن
+rahim,raheem=الرحیم
+karim,kareem=الکریم
+ghafoor,ghafur=الغفور
+ghaffar=الغفار
+ghani=الغنی
+majeed,majid=المجید
+hameed,hamid=الحمید
+razzaq,razzak,razaq=الرزاق
+qadir,qadeer=القادر
+sattar=الستار
+rauf,raoof=الرؤف
+wahab,wahhab=الوہاب
+wahid=الواحد
+waheed=الوحید
+latif,lateef=اللطیف
+aziz,azeez=العزیز
+basit=الباسط
+jabbar=الجبار
+salam=السلام
+malik=الملک
+bari=الباری
+khaliq=الخالق
+qayyum,qayum=القیوم
+shakoor,shakur=الشکور
+samad=الصمد
+haq,haque=الحق
+rasheed,rashid=الرشید
+mannan=المنان
+hadi=الہادی
+hakeem,hakim=الحکیم
+mateen=المتین
+jalil,jaleel=الجلیل
+quddus,qudoos=القدوس
+wadood=الودود
+wali=الولی
+ahad=الاحد
+nasir=الناصر
+naseer=النصیر
+rafi,rafay=الرافع
+mujeeb=المجیب
+hafeez,hafiz=الحفیظ
+ali=العلی
+sami,samee=السمیع
+baseer=البصیر
+mohsin=المحسن
+aleem,alim=العلیم
+fattah=الفتاح
+ullah,allah=اللہ
+`;
+
+        function parseDict(text) {
+            const map = Object.create(null);
+            text.split('\n').forEach(line => {
+                line = line.trim();
+                if (!line) return;
+                const idx = line.lastIndexOf('=');
+                const val = line.slice(idx + 1).trim();
+                line.slice(0, idx).split(',').forEach(k => { k = k.trim(); if (k) map[k] = val; });
+            });
+            return map;
+        }
+        const known = parseDict(DICT);
+        const abdulMap = parseDict(ABDUL);
+
+        // Spelling-variant matching (e.g. "Raheem" ~ "Rahim", "Mohsin" ~ "Muhsin")
+        function norm(w) {
+            return w.replace(/ph/g, 'f').replace(/ou|oo/g, 'u').replace(/ee/g, 'i').replace(/ai|ay|ey/g, 'i')
+                .replace(/[eo]/g, m => (m === 'e' ? 'i' : 'u')).replace(/w/g, 'v').replace(/y/g, 'i').replace(/q/g, 'k')
+                .replace(/(.)\1+/g, '$1').replace(/h$/, '');
+        }
+        function buildNorm(map) {
+            const nm = Object.create(null);
+            const bad = Object.create(null);
+            Object.keys(map).forEach(k => {
+                const n = norm(k);
+                if (nm[n] && nm[n] !== map[k]) bad[n] = true;
+                else nm[n] = map[k];
+            });
+            Object.keys(bad).forEach(n => delete nm[n]);
+            return nm;
+        }
+        const knownNorm = buildNorm(known);
+        const abdulNorm = buildNorm(abdulMap);
+        const lookup = w => known[w] || knownNorm[norm(w)] || null;
+        const lookupAbdul = w => abdulMap[w] || abdulNorm[norm(w)] || null;
+
+        // ---- Rule-based fallback for names that are not in the dictionary ----
+        const di = { kh:'خ', gh:'غ', sh:'ش', ch:'چ', th:'تھ', ph:'پھ', bh:'بھ', dh:'دھ', jh:'جھ' };
+        const si = { b:'ب', p:'پ', t:'ت', j:'ج', d:'د', r:'ر', z:'ز', s:'س', f:'ف', q:'ق', k:'ک', g:'گ', l:'ل', m:'م', n:'ن', w:'و', v:'و', h:'ہ', y:'ی', c:'ک', x:'کس' };
+        const isV = ch => 'aeiou'.indexOf(ch) !== -1;
+
+        function localTranslit(word) {
+            const w = word.toLowerCase().replace(/([b-df-hj-np-tv-z])\1+/g, '$1');
+            let out = '';
+            let i = 0;
+            while (i < w.length) {
+                const two = w.substr(i, 2);
+                const c = w[i];
+                const atStart = i === 0;
+                const atEnd = i === w.length - 1;
+                if (di[two]) { out += di[two]; i += 2; continue; }
+                if (two === 'aa') { out += atStart ? 'آ' : 'ا'; i += 2; continue; }
+                if (two === 'ee') { out += atStart ? 'ای' : 'ی'; i += 2; continue; }
+                if (two === 'oo') { out += atStart ? 'او' : 'و'; i += 2; continue; }
+                if (two === 'ou' || two === 'au') { out += atStart ? 'او' : 'و'; i += 2; continue; }
+                if (two === 'ai' || two === 'ay' || two === 'ey') { out += atStart ? 'ای' : (i + 2 === w.length ? 'ے' : 'ی'); i += 2; continue; }
+                if (two === 'ie') { out += 'ی'; i += 2; continue; }
+                if (isV(c)) {
+                    if (atStart) out += c === 'o' ? 'او' : 'ا';
+                    else if (c === 'a' && atEnd) out += 'ا';
+                    else if (c === 'a' && i === w.length - 2 && !isV(w[i + 1])) out += 'ا';
+                    else if (c === 'i' && atEnd) out += 'ی';
+                    else if (c === 'o') out += 'و';
+                    else if (c === 'e' && atEnd) out += 'ے';
+                    // short medial vowels (a, i, u, e) are omitted in Urdu spelling
+                    i++; continue;
+                }
+                if (si[c]) { out += si[c]; i++; continue; }
+                out += c; i++;
+            }
+            return out;
+        }
+
+        const cache = Object.create(null); // Google Input Tools results for names not in the dictionary
+        function wordU(w) {
+            const k = lookup(w);
+            if (k) return k;
+            let m = /^(.{3,}?)(uddin|ud-din|uldin|uddeen|ulddin)$/.exec(w);
+            if (m) return wordU(m[1]) + ' الدین';
+            m = /^(.{2,}?)(ullah|ulla|ullh)$/.exec(w);
+            if (m) return wordU(m[1]) + ' اللہ';
+            return cache[w] || localTranslit(w);
+        }
+        const cleanW = s => s.toLowerCase().replace(/[^a-z]/g, '');
+        const abdulWords = ['abdul', 'abdur', 'abdus', 'abdel', 'abd', 'abdu'];
+        const alWords = ['ul', 'ur', 'us', 'ud', 'un', 'uz', 'ush', 'al', 'el'];
+
+        function localPhrase(parts) {
+            const out = [];
+            for (let i = 0; i < parts.length; i++) {
+                const raw = parts[i];
+                const w = cleanW(raw);
+                if (!w || !/[A-Za-z]/.test(raw)) { out.push(raw); continue; }
+                const nx = i + 1 < parts.length ? cleanW(parts[i + 1]) : '';
+                if (abdulWords.indexOf(w) !== -1 && nx) {
+                    out.push('عبد' + (lookupAbdul(nx) || ('ال' + wordU(nx))));
+                    i++; continue;
+                }
+                if (alWords.indexOf(w) !== -1 && nx) {
+                    out.push('ال' + wordU(nx));
+                    i++; continue;
+                }
+                out.push(wordU(w));
+            }
+            return out;
+        }
+
+        // words that the dictionary cannot resolve are sent to Google Input Tools (optional upgrade)
+        function unknownWords(parts) {
+            const res = [];
+            for (let i = 0; i < parts.length; i++) {
+                const w = cleanW(parts[i]);
+                if (!w || !/[A-Za-z]/.test(parts[i])) continue;
+                if (abdulWords.indexOf(w) !== -1 || alWords.indexOf(w) !== -1) continue;
+                if (lookup(w) || abdulWords.indexOf(cleanW(parts[i - 1] || '')) !== -1) continue;
+                if (/(uddin|ud-din|uldin|uddeen|ullah|ulla|ullh)$/.test(w)) continue;
+                if (!(w in cache) && res.indexOf(w) === -1) res.push(w);
+            }
+            return res;
+        }
+        async function googleWord(w) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 2500);
+                const res = await fetch('https://inputtools.google.com/request?itc=ur-t-i0-und&num=1&cp=0&cs=1&ie=utf-8&oe=utf-8&app=demopage&text=' + encodeURIComponent(w), { signal: ctrl.signal });
+                clearTimeout(timer);
+                const json = await res.json();
+                if (json && json[0] === 'SUCCESS' && json[1] && json[1][0] && json[1][0][1] && json[1][0][1][0]) {
+                    return json[1][0][1][0];
+                }
+            } catch (e) { /* keep the local spelling */ }
+            return null;
+        }
+
+        // In Urdu mode the real input (English value, used by calculations and the log) is made
+        // transparent and an Urdu overlay is drawn exactly on top of it. The value is never changed.
+        const styleEl = document.createElement('style');
+        styleEl.textContent =
+            '#name-field-wrap{position:relative}' +
+            'body.lang-ur #pensioner-name{color:transparent !important;caret-color:#111;direction:rtl !important;text-align:right}' +
+            '#name-urdu-display{position:absolute;top:0;bottom:0;left:0;right:0;padding:0 0.75rem;display:none;align-items:center;justify-content:flex-start;pointer-events:none;white-space:nowrap;overflow:hidden;color:#1f2937;font-size:1rem;direction:rtl}' +
+            'body.lang-ur #name-urdu-display{display:flex}';
+        document.head.appendChild(styleEl);
+
+        const wrap = document.createElement('div');
+        wrap.id = 'name-field-wrap';
+        input.parentElement.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        const box = document.createElement('div');
+        box.id = 'name-urdu-display';
+        box.setAttribute('data-no-i18n', '');
+        wrap.appendChild(box);
+
+        let lastKey = '';
+        let seq = 0;
+        async function update() {
+            const isUr = document.body.classList.contains('lang-ur');
+            const v = input.value.trim().replace(/-/g, ' ');
+            const key = (isUr ? 'u:' : 'e:') + v;
+            if (key === lastKey) return;
+            lastKey = key;
+            const mine = ++seq;
+            if (!isUr || !v) { box.textContent = ''; return; }
+            const parts = v.split(/\s+/);
+            box.textContent = localPhrase(parts).join(' ');   // instant, dictionary-based
+            const unknown = unknownWords(parts);
+            if (!unknown.length) return;
+            const results = await Promise.all(unknown.map(googleWord));
+            unknown.forEach((w, idx) => { cache[w] = results[idx] || localTranslit(w); });
+            if (mine !== seq) return;
+            box.textContent = localPhrase(parts).join(' ');
+        }
+        setInterval(update, 400);
+        ['input', 'change', 'keyup'].forEach(ev => input.addEventListener(ev, update));
+        const langBtn = document.getElementById('lang-toggle-btn');
+        if (langBtn) langBtn.addEventListener('click', () => setTimeout(update, 0));
+        update();
+    })();
     </script>
 </body>
 </html>
