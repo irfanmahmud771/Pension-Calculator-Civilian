@@ -372,6 +372,34 @@
         /* Urdu: keep values in "Final Pension After Increases" at the left edge, like Service Summary */
         body.lang-ur .output-group .value.text-right { text-align: left; }
         body.lang-ur .output-group .w-1\/3 { width: auto; }
+        /* Urdu on mobile: Calculated Results rows = label on the right, result on the left */
+        @media (max-width: 768px) {
+            body.lang-ur .output-group,
+            body.lang-ur .output-group.font-bold {
+                flex-direction: row;
+                justify-content: space-between;
+                align-items: flex-start;
+                gap: 0.75rem;
+            }
+            body.lang-ur .output-group .label,
+            body.lang-ur .output-group .w-1\/3.label {
+                flex: 1 1 auto;
+                width: auto !important;
+                margin-bottom: 0;
+                padding-left: 0;
+                padding-right: 0;
+                text-align: right !important;
+                white-space: normal;
+            }
+            body.lang-ur .output-group .value,
+            body.lang-ur .output-group .w-1\/3 {
+                flex: 0 0 auto;
+                width: auto !important;
+                padding-left: 0;
+                padding-right: 0;
+                text-align: left !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gray-50 text-gray-800">
