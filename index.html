@@ -326,6 +326,9 @@
             .output-group.font-bold .label.w-1\/3:first-child {
                 display: none;
             }
+            /* Restoration bar heading: same sizes as the other result rows */
+            #restoration-bar-wrap .label { font-size: 0.875rem; }
+            #restoration-bar-wrap .value { font-size: 1rem; }
         }
         /* --- End Mobile Styles --- */
         /* --- Language toggle (English / Urdu) --- */
@@ -682,6 +685,17 @@
                         <div class="output-group">
                             <span class="label w-1/3 whitespace-nowrap">Period Remaing in Restoration</span>
                             <span class="value text-gray-800 text-right" id="period-remaining-restoration-output">0 Years</span>
+                        </div>
+                        <!-- Restoration remaining-period bar graph (display only) -->
+                        <div id="restoration-bar-wrap" class="pt-3 pb-1" style="display:none;">
+                            <div class="flex justify-between items-center" style="margin-bottom:0.75rem;">
+                                <span class="label" style="font-weight:500;color:#2D3748;">Remaining Period (%)</span>
+                                <span id="restoration-bar-pct" class="value text-blue-700" style="direction:ltr;font-weight:600;">0%</span>
+                            </div>
+                            <div id="restoration-bar-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"
+                                 style="direction:ltr;width:100%;height:1.8rem;background-color:#E2E8F0;border-radius:9999px;overflow:hidden;">
+                                <div id="restoration-bar-fill" style="height:100%;width:0%;background-color:#2563EB;border-radius:9999px;transition:width 0.6s ease;"></div>
+                            </div>
                         </div>
                      </div>
                 </div>
@@ -2250,8 +2264,31 @@
             });
         }
 
+        // Display-only: draws the blue bar showing the remaining % of the restoration period
+        function updateRestorationBar(sosDate, restorationDate, today) {
+            const wrap = document.getElementById('restoration-bar-wrap');
+            if (!wrap) return;
+            // Hidden when there is no data, or once the pension has been restored
+            if (!sosDate || !restorationDate || !today || restorationDate <= today) { wrap.style.display = 'none'; return; }
+            const start = new Date(sosDate);
+            start.setUTCDate(start.getUTCDate() + 1);
+            const total = restorationDate - start;
+            let pct = 0;
+            if (total > 0 && restorationDate > today) {
+                pct = ((restorationDate - today) / total) * 100;
+                pct = Math.max(0, Math.min(100, pct));
+            }
+            const shown = pct.toFixed(1).replace(/\.0$/, '');
+            document.getElementById('restoration-bar-fill').style.width = pct + '%';
+            document.getElementById('restoration-bar-pct').textContent = shown + '%';
+            document.getElementById('restoration-bar-track').setAttribute('aria-valuenow', shown);
+            wrap.style.display = 'block';
+        }
+
         // NEW: Helper function to reset all output fields when calculation is skipped
         function resetOutputFields() {
+            const barWrap = document.getElementById('restoration-bar-wrap');
+            if (barWrap) barWrap.style.display = 'none';
             // Service Summary
             document.getElementById('qs-output').textContent = '0 Years';
             document.getElementById('age-at-sos-output').textContent = '0 Years';
@@ -2376,6 +2413,8 @@
                 : 'Completed';
             document.getElementById('period-remaining-restoration-output').textContent = restorationDate ? remainingRestorationDisplay : 'N/A';
 
+            // Bar graph: remaining % of the restoration period (SOS + 1 day -> restoration date)
+            updateRestorationBar(sosDate, restorationDate, today);
 
             // 4. Financial Calculations (Only if Gross Pension > 0)
             if (grossPensionPPO <= 0) {
@@ -3183,6 +3222,7 @@
             'Pension Restoration Date': 'پنشن بحالی کی تاریخ',
             'Age on Pension Restoration': 'پنشن بحالی پر عمر',
             'Period Remaing in Restoration': 'بحالی میں باقی مدت',
+            'Remaining Period (%)': 'باقی مدت (فیصد)',
             'Pension Increase Calculations': 'پنشن اضافوں کا حساب',
             'Increase Year': 'اضافے کا سال',
             '%age': 'فیصد',
